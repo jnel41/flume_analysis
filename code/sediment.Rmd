@@ -1,0 +1,84 @@
+---
+title: "Flume analysis"
+author: "JN"
+date: "`r Sys.Date()`"
+output: 
+  html_document: 
+    toc: true
+---
+
+```{r create_sediment, cache.extra=tools::md5sum("../data/tidy/flume_event_data612_UPDATE.csv")}
+
+library("tidyverse")
+
+flume <- read_csv("../data/tidy/flume_event_data612_UPDATE.csv") %>%
+  mutate(Year = factor(Year)) %>%
+  subset(subtreatment != 'grass strip') %>%
+  subset(SiteID != 'MCN') %>%
+  subset(subset=!(SiteID=="RHO" & Year == 2016)) %>%
+  subset(subset=!(SiteID=="RHO" & Year == 2017))
+```
+```{r total, dependson="create_sediment"}
+flume_sum <- flume %>%
+  group_by(Treatment, Year, SiteID, sample_event, tss_sum) %>%
+  summarize(tss_load = tss_sum,
+            ln_tss_load = log(tss_load+0.000198)) %>%
+  distinct() 
+
+
+ppt_sum <- flume %>%
+  group_by(Treatment, Year, SiteID, sample_event) %>%
+  summarize(ppt_sum = sum(precipitation)) %>%
+  ungroup() %>%
+  filter(!duplicated(cbind(Year, SiteID, sample_event)))
+
+```
+
+
+```{r pivot tables, dependson = "total"}
+sample_anova <- flume_sum %>%
+  filter(!is.na(tss_sum)) %>%
+  select(Year, SiteID, Treatment, sample_event, tss_sum) %>%
+  group_by(SiteID, Year, Treatment, sample_event) %>%
+    summarize(tss_load = sum(tss_sum)) %>% 
+  ungroup() %>%
+  select(Year, SiteID, Treatment, sample_event, tss_load) %>%
+  pivot_wider(names_from = Treatment, values_from = tss_load)
+
+pivot_sample <- sample_anova %>%
+  inner_join(ppt_sum,by=c("SiteID", "Year", "sample_event")) %>%
+  mutate(ln_ppt = log(ppt_sum),
+         ln_ctl = log(control+0.005322915),
+         ln_trt = log(strips+0.0104)) %>%
+  subset(select = -c(Treatment))
+
+long_load <- sample_anova %>%
+  gather(Treatment, tss_load, control:strips) %>%
+  arrange(Treatment, tss_load) %>%
+  select(SiteID, Treatment, Year, sample_event, tss_load)
+
+```
+
+```{r random coding, dependson = "pivot tables"}
+rf_ro_pivot <- long_load %>%
+  mutate(random = (ifelse(SiteID == 'ARM', 'NR',
+  ifelse(SiteID == 'EIA', 'R',
+  ifelse(SiteID == 'MCN', 'R', 
+  ifelse(SiteID == 'HOE', 'NR',
+  ifelse(SiteID == 'MAR', 'NR',
+  ifelse(SiteID == 'RHO', 'R',
+  ifelse(SiteID == 'WHI', 'NR',
+  ifelse(SiteID == 'WOR', 'R', 0))))))))))
+
+```
+
+```{r full dataframe, dependson = "random coding"}
+full_df <- rf_ro_pivot %>%
+  inner_join(ppt_sum,by=c("SiteID", "Year", "sample_event")) %>%
+  mutate(ln_ppt = log(ppt_sum),
+         #ln_tss_load = log(tss_load+0.005322915),
+         Treatment = Treatment.x) %>%
+  subset(select = -c(Treatment.y, Treatment.x)) %>%
+  arrange(Year, SiteID, Treatment, sample_event)
+
+```

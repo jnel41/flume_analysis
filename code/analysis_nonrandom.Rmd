@@ -1,0 +1,116 @@
+---
+title: "analysis_nonrandom"
+author: "Jnelly"
+date: "3/16/2022"
+output: html_document
+---
+
+```{r setup}
+knitr::opts_chunk$set(echo = TRUE,
+                      cache = TRUE,
+                      fig.width = 12,
+                      fig.height = 12)
+
+library("lme4")
+library("lmerTest")
+library("tidyverse"); theme_set(theme_bw())
+library("emmeans")
+library("ggResidpanel")
+library("data.table")
+library("stringr")
+
+options(width = 120)
+
+dir.create("fig", showWarnings = FALSE)
+```
+
+```{r}
+sessionInfo()
+```
+
+## Read in data
+
+```{r, child="sediment.Rmd"}
+```
+
+```{r, diversion_coding, dependson = "create_soilpad"}
+flumeNR <- TSS_events %>%
+  #filter(!is.na(ro_event)) %>%
+    subset(random == 'NR')
+
+```
+
+## Exploratory analysis
+
+## Site-year with rainfall event
+
+```{r, dependson="create_soilpad"}
+site_year_rfeventNR <- flumeNR %>%
+  select(SiteID, Year, rf_event) %>%
+  unique()
+
+ggplot(site_year_rfeventNR, aes(Year, SiteID, fill=rf_event)) +
+  geom_tile()
+```
+
+## Number of samples
+
+Calculate the number of observations for each treatment-position-year-site-time
+combination. 
+
+```{r soilpad_counts, dependson="create_soilpad"}
+TSS_countsNR <- flumeNR %>%
+  group_by(Year, SiteID, rf_event) %>%
+  distinct() %>%
+  summarize(n = n(), .groups = "drop")
+```
+
+Plot the number of observations for each combination. 
+
+```{r plot_count, dependson="soilpad_counts", out.width = "\\textwidth"}
+g <- ggplot(TSS_countsNR, aes(x = Year, y= SiteID, fill = n)) +
+  geom_tile() +
+  geom_text(aes(label = n), color = "white") +
+  scale_fill_gradient(low = "blue", high = "red") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+g 
+##ggsave("fig/soilpad_counts_no_diversion.png", g, width = 12, height = 12)
+```
+# Main Analyses
+
+There are three main analyses of interest:
+
+- confirmatory, design-based analysis
+- exploratory, covariate analysis
+- relationship of sediment flow to sediment loss
+
+```{r soilpad_counts, dependson="create_soilpad"}
+flumeR_sum <- flumeNR %>%
+  group_by(Treatment, Year, SiteID, ro_event, tss_sum) %>%
+  summarize(ppt_sum = sum(precipitation)) %>%
+  distinct()
+
+```
+
+
+```{r design_model, dependson = "create_soilpad"}
+
+mNR_flume <- lmerTest::lmer(log(tss_sum+0.000198) ~ 
+                             (1 | SiteID) +
+                             #(1 | SiteID:Treatment) + 
+                             (1 | SiteID:ppt_sum) + 
+                             Treatment*ppt_sum,
+                           data = flumeNR_sum)
+
+mNR_flume_step <- step(mNR_flume, 
+                    reduce.random = FALSE,
+                    alpha.fixed = 0.1)
+
+mNR_flume_step
+
+mNR_flume_model <- get_model(mNR_flume_step)
+# design_model <- design_model_full # override backward selection
+
+summary(mNR_flume_model)
+```

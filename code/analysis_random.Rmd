@@ -1,0 +1,136 @@
+---
+title: "analysis_random"
+author: "Jnelly"
+date: "3/16/2022"
+output: pdf_document
+---
+
+```{r setup}
+knitr::opts_chunk$set(echo = TRUE,
+                      cache = TRUE,
+                      fig.width = 12,
+                      fig.height = 12)
+
+library("lme4")
+library("lmerTest")
+library("tidyverse"); theme_set(theme_bw())
+library("emmeans")
+library("ggResidpanel")
+library("data.table")
+library("stringr")
+
+options(width = 120)
+
+dir.create("fig", showWarnings = FALSE)
+```
+
+```{r}
+sessionInfo()
+```
+
+## Read in data
+
+```{r, child="sediment.Rmd"}
+```
+
+```{r, flume_random, dependson = "create_sediment"}
+flumeR <- full_df %>%
+  #filter(!is.na(ro_event)) %>%
+    subset(random == 'R')
+
+```
+
+## Exploratory analysis
+
+## Site-year with rainfall event
+
+```{r, dependson="flume_random"}
+site_year_rfeventR <- flumeR %>%
+  select(SiteID, Year, sample_event) %>%
+  unique()
+
+ggplot(site_year_rfeventR, aes(Year, SiteID, fill=sample_event)) +
+  geom_tile()
+```
+
+
+## Number of samples
+
+Calculate the number of observations for each treatment-position-year-site-time
+combination. 
+
+```{r sample_event_counts, dependson="flume_random"}
+TSS_countsR <- flumeR %>%
+  group_by(Year, SiteID, sample_event) %>%
+  distinct() %>%
+  summarize(n = n(), .groups = "drop")
+```
+
+Plot the number of observations for each combination. 
+
+```{r plot_count, dependson="sample_event_counts", out.width = "\\textwidth"}
+g <- ggplot(TSS_countsR, aes(x = Year, y= SiteID, fill = n)) +
+  geom_tile() +
+  geom_text(aes(label = n), color = "white") +
+  scale_fill_gradient(low = "blue", high = "red") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+g 
+##ggsave("fig/soilpad_counts_no_diversion.png", g, width = 12, height = 12)
+```
+
+## Data visualization
+
+```{r, dependson="flume_random"}
+ggscatter(
+  flumeR, x = "ln_ppt", y = "ln_tss_load",
+  color = "Treatment", add = "reg.line"
+  )+
+  stat_regline_equation(
+    aes(label =  paste(..eq.label.., ..rr.label.., sep = "~~~~"), color = Treatment)
+    )
+
+
+```
+
+
+# Main Analyses
+
+There are three main analyses of interest:
+
+- confirmatory, design-based analysis
+- exploratory, covariate analysis
+- relationship of sediment flow to sediment loss
+
+
+```{r design_model, dependson = "flume_random"}
+mR_flume <- lmerTest::lmer(ln_tss_load ~ 
+                             #(1 | SiteID) +
+                             (1 | SiteID:Treatment) + 
+                             Treatment*ln_ppt +
+                            Year,
+                          data = flumeR)
+summary(mR_flume)
+
+```
+
+```{r design_model_contrasts, dependson = "design_model"}
+treatmentR = emmeans(mR_flume, pairwise ~ Treatment, 
+                    type = "response", # calculated log ahead of time instead of in model; the minus indicates it didn't back transform; difference between control and strips on the log-scale. Exponentiate the tails of the ci and estimate. 
+                    lmer.df = "asymptotic") 
+
+confint(treatmentR)$contrasts
+
+treatment = emmeans(mR_flume, pairwise ~ Treatment|ln_ppt,
+                    at=list(ln_ppt=c(-4,-3,-2)), 
+                    type = "response",
+                    lmer.df = "asymptotic")
+
+confint(treatment)$contrasts ## exp. the values
+
+year = emmeans(mR_flume, ~ Year,
+                    type = "response",
+                    lmer.df = "asymptotic")
+
+confint(year)## exp. the values
+```

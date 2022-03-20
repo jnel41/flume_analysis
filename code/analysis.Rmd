@@ -1,0 +1,178 @@
+---
+title: "Soilpad analysis"
+author: "Jarad Niemi"
+date: "`r Sys.Date()`"
+output:
+  pdf_document:
+    toc: yes
+  html_document:
+    toc: yes
+---
+
+```{r setup}
+knitr::opts_chunk$set(echo = TRUE,
+                      cache = TRUE,
+                      fig.width = 12,
+                      fig.height = 12)
+
+library("lme4")
+library("lmerTest")
+library("tidyverse"); theme_set(theme_bw())
+
+library("emmeans")
+library("ggResidpanel")
+library("data.table")
+library("stringr")
+#install.packages("rstatix")
+library("ggpubr")
+library("rstatix")
+library("broom")
+
+options(width = 120)
+
+dir.create("fig", showWarnings = FALSE)
+```
+
+```{r}
+sessionInfo()
+```
+
+## Read in data
+
+```{r, child="sediment.Rmd"}
+```
+
+## Exploratory analysis
+
+## Site-year with rainfall event
+
+```{r, dependson="create_sediment"}
+site_year_rfevent <- flume %>%
+  select(SiteID, Year, rf_event) %>%
+  unique()
+
+ggplot(site_year_rfevent, aes(Year, SiteID, fill=rf_event)) +
+  geom_tile()
+```
+
+
+## Number of samples
+
+Calculate the number of observations for each treatment-position-year-site-time
+combination. 
+
+```{r sample_event_counts, dependson="create_sediment"}
+TSS_counts <- flume %>%
+  group_by(Year, SiteID, rf_event) %>%
+  distinct() %>%
+  summarize(n = n(), .groups = "drop")
+```
+
+Plot the number of observations for each combination. 
+
+```{r plot_count, dependson="sample_event_counts", out.width = "\\textwidth"}
+g <- ggplot(TSS_counts, aes(x = Year, y= SiteID, fill = n)) +
+  geom_tile() +
+  geom_text(aes(label = n), color = "white") +
+  scale_fill_gradient(low = "blue", high = "red") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+g 
+##ggsave("fig/soilpad_counts_no_diversion.png", g, width = 12, height = 12)
+```
+
+
+## Data visualization
+
+```{r, dependson="create_sediment"}
+ggscatter(
+  rf_ro_pivot, x = "ln_ppt", y = "ln_tss_load",
+  color = "Treatment", add = "reg.line"
+  )+
+  stat_regline_equation(
+    aes(label =  paste(..eq.label.., ..rr.label.., sep = "~~~~"), color = Treatment)
+    )
+
+
+```
+
+
+```{r, dependson="create_sediment"}
+#pivot_sample %>% 
+#  anova_test(ln_trt ~ ln_ppt*ln_ctl)
+## purr https://stackoverflow.com/questions/50702152/compare-models-via-anova-with-purrr-or-dplyr
+## anova() and may need an linear model built up.
+```
+
+
+# Main Analyses
+
+There are three main analyses of interest:
+
+- confirmatory, design-based analysis
+- exploratory, covariate analysis
+- relationship of sediment flow to sediment loss
+
+## Confirmatory, design-based analysis
+
+### Treatment effect
+
+```{r design_model, dependson = "create_sediment"}
+m_flume <- lmerTest::lmer(ln_tss_load ~ 
+                             #(1 | SiteID) +
+                             (1 | SiteID:Treatment) + 
+                             Treatment*ln_ppt + Year,
+                          data = full_df)
+
+summary(m_flume)
+
+```
+
+```{r design_step_model, dependson = "design_model"}
+m_flume_step <- step(m_flume, reduce.random = FALSE, alpha.fixed = 0.1)
+m_flume_model <- get_model(m_flume_step)
+summary(m_flume_model)
+
+##https://campus.datacamp.com/courses/hierarchical-and-mixed-effects-models-in-r/linear-mixed-effect-models?ex=7
+```
+
+
+
+```{r design_model_contrasts, dependson = "design_model"}
+treatment = emmeans(m_flume, pairwise ~ Treatment, 
+                    type = "response", # calculated log ahead of time instead of in model; the minus indicates it didn't back transform; difference between control and strips on the log-scale. Exponentiate the tails of the ci and estimate. 
+                    lmer.df = "asymptotic") 
+
+confint(treatment)$contrasts
+
+year = emmeans(m_flume, ~ Year, 
+                    type = "response",
+                    lmer.df = "asymptotic") 
+confint(year)
+
+treatment = emmeans(m_flume, pairwise ~ Treatment|ln_ppt,
+                    at=list(ln_ppt=c(-4,-3,-2)), 
+                    type = "response",
+                    lmer.df = "asymptotic")
+
+confint(treatment)$contrasts ## exp. the values
+
+```
+
+```{r design_model_residual_plots, dependson = "design_model"}
+resid_panel(m_flume, 
+            plots = c("resid","index","yvp","qq"),
+            smoother = TRUE, qqbands = TRUE)
+
+resid_xpanel(m_flume_model)
+```
+
+Possibly heavy-tailed residuals. 
+
+Non-constant variance amongst Site and Diversion. 
+
+
+### Ratio comparison
+
+
+List of PadIDs that had a diversion pair. 
