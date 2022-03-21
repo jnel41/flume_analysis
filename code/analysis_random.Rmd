@@ -33,7 +33,7 @@ sessionInfo()
 ```{r, child="sediment.Rmd"}
 ```
 
-```{r, flume_random, dependson = "create_sediment"}
+```{r flume_random, dependson = "create_sediment"}
 flumeR <- full_df %>%
   #filter(!is.na(ro_event)) %>%
     subset(random == 'R')
@@ -82,15 +82,14 @@ g
 ## Data visualization
 
 ```{r, dependson="flume_random"}
-ggscatter(
-  flumeR, x = "ln_ppt", y = "ln_tss_load",
-  color = "Treatment", add = "reg.line"
-  )+
-  stat_regline_equation(
-    aes(label =  paste(..eq.label.., ..rr.label.., sep = "~~~~"), color = Treatment)
-    )
+#hR <- ggplot(flumeR, aes(x=ln_ppt, y=ln_tss_load, color=Treatment)) +
+#  geom_point() + 
+#  geom_smooth(method=lm, se=FALSE, fullrange=TRUE) +
+#  ggtitle("Log-log relationship between TSS load and rainfall accumulation \n(random dataset)") +
+#  theme(plot.title = element_text(size=14, face="bold",hjust = 0.5))
+  
 
-
+#ggsave("fig/randReg_ppt_load.png", hR, width = 12, height = 12)
 ```
 
 
@@ -104,7 +103,7 @@ There are three main analyses of interest:
 
 
 ```{r design_model, dependson = "flume_random"}
-mR_flume <- lmerTest::lmer(ln_tss_load ~ 
+mR_flume <- lmerTest::lmer(log(tss_load+0.005322915) ~ 
                              #(1 | SiteID) +
                              (1 | SiteID:Treatment) + 
                              Treatment*ln_ppt +
@@ -122,7 +121,7 @@ treatmentR = emmeans(mR_flume, pairwise ~ Treatment,
 confint(treatmentR)$contrasts
 
 treatment = emmeans(mR_flume, pairwise ~ Treatment|ln_ppt,
-                    at=list(ln_ppt=c(-4,-3,-2)), 
+                    at=list(ln_ppt=c(-3,-2, -1)), 
                     type = "response",
                     lmer.df = "asymptotic")
 
@@ -133,4 +132,38 @@ year = emmeans(mR_flume, ~ Year,
                     lmer.df = "asymptotic")
 
 confint(year)## exp. the values
+```
+
+
+```{r design_model_residual_plots, dependson = "design_model"}
+resid_panel(mR_flume, 
+            plots = c("resid","index","yvp","qq"),
+            smoother = TRUE, qqbands = TRUE)
+
+resid_xpanel(mR_flume)
+```
+
+```{r design_model, dependson = "flume_random"}
+trt <- pivot$ln_trt
+ctl <- pivot$ln_ctl
+
+res <- t.test(ctl, trt, paired = TRUE)
+res
+```
+
+```{r flume_random, dependson = "create_sediment"}
+pivot <- pivot_sample %>%
+    subset(random == 'R')
+
+```
+
+```{r design_model, dependson = "flume_random"}
+mR_pivot <- lmerTest::lmer(log(abs(diff)+0.0016488) ~ 
+                             #(1 | SiteID) +
+                             (1 | SiteID:Treatment) + 
+                             Treatment*log(ppt_sum) +
+                            Year,
+                          data = long_load)
+summary(mR_pivot)
+
 ```

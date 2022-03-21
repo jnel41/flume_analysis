@@ -85,14 +85,14 @@ g
 ## Data visualization
 
 ```{r, dependson="create_sediment"}
-ggscatter(
-  rf_ro_pivot, x = "ln_ppt", y = "ln_tss_load",
-  color = "Treatment", add = "reg.line"
-  )+
-  stat_regline_equation(
-    aes(label =  paste(..eq.label.., ..rr.label.., sep = "~~~~"), color = Treatment)
-    )
+#h <- ggplot(full_df, aes(x=ln_ppt, y=ln_tss_load, color=Treatment), inherit.aes = FALSE) +
+#  geom_point() + 
+#  geom_smooth(method=lm, se=FALSE, fullrange=TRUE) +
+#  ggtitle("Log-log relationship between TSS load and rainfall accumulation \n(full dataset)") +
+#  theme(plot.title = element_text(size=14, face="bold",hjust = 0.5))
+  
 
+#ggsave("fig/randReg_ppt_load.png", h, width = 12, height = 12)
 
 ```
 
@@ -118,10 +118,11 @@ There are three main analyses of interest:
 ### Treatment effect
 
 ```{r design_model, dependson = "create_sediment"}
-m_flume <- lmerTest::lmer(ln_tss_load ~ 
+m_flume <- lmerTest::lmer(log(tss_load+0.005322915) ~ 
                              #(1 | SiteID) +
                              (1 | SiteID:Treatment) + 
-                             Treatment*ln_ppt + Year,
+                             Treatment*ln_ppt + 
+                            Year,
                           data = full_df)
 
 summary(m_flume)
@@ -164,7 +165,7 @@ resid_panel(m_flume,
             plots = c("resid","index","yvp","qq"),
             smoother = TRUE, qqbands = TRUE)
 
-resid_xpanel(m_flume_model)
+resid_xpanel(m_flume)
 ```
 
 Possibly heavy-tailed residuals. 

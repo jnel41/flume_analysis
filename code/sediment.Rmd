@@ -47,15 +47,19 @@ sample_anova <- flume_sum %>%
 
 pivot_sample <- sample_anova %>%
   inner_join(ppt_sum,by=c("SiteID", "Year", "sample_event")) %>%
+  filter(!is.na(strips)) %>%
   mutate(ln_ppt = log(ppt_sum),
+         diff = strips-control,
+         ln_diff = log(abs(diff)+0.00165),
          ln_ctl = log(control+0.005322915),
          ln_trt = log(strips+0.0104)) %>%
   subset(select = -c(Treatment))
 
-long_load <- sample_anova %>%
+long_load <- pivot_sample %>%
   gather(Treatment, tss_load, control:strips) %>%
   arrange(Treatment, tss_load) %>%
-  select(SiteID, Treatment, Year, sample_event, tss_load)
+  filter(!is.na(diff)) %>%
+  select(SiteID, Treatment, Year, sample_event, tss_load, diff, ppt_sum)
 
 ```
 
@@ -70,15 +74,26 @@ rf_ro_pivot <- long_load %>%
   ifelse(SiteID == 'WHI', 'NR',
   ifelse(SiteID == 'WOR', 'R', 0))))))))))
 
+long_load <- long_load %>%
+  mutate(random = (ifelse(SiteID == 'ARM', 'NR',
+  ifelse(SiteID == 'EIA', 'R',
+  ifelse(SiteID == 'MCN', 'R', 
+  ifelse(SiteID == 'HOE', 'NR',
+  ifelse(SiteID == 'MAR', 'NR',
+  ifelse(SiteID == 'RHO', 'R',
+  ifelse(SiteID == 'WHI', 'NR',
+  ifelse(SiteID == 'WOR', 'R', 0))))))))))
 ```
 
 ```{r full dataframe, dependson = "random coding"}
 full_df <- rf_ro_pivot %>%
   inner_join(ppt_sum,by=c("SiteID", "Year", "sample_event")) %>%
+  drop_na(tss_load) %>%
   mutate(ln_ppt = log(ppt_sum),
-         #ln_tss_load = log(tss_load+0.005322915),
+         ln_tss_load = log(tss_load+0.005322915),
          Treatment = Treatment.x) %>%
   subset(select = -c(Treatment.y, Treatment.x)) %>%
   arrange(Year, SiteID, Treatment, sample_event)
-
+  
+write.csv(full_df,"D:/ISU/ResearchProject/flume_analysis/data/tidy/full_df.csv", row.names = FALSE)
 ```
