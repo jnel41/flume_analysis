@@ -46,7 +46,7 @@ sample_anova <- flume_sum %>%
   pivot_wider(names_from = Treatment, values_from = tss_load)
 
 pivot_sample <- sample_anova %>%
-  inner_join(ppt_sum,by=c("SiteID", "Year", "sample_event")) %>%
+  inner_join(ppt_sum,by=c("SiteID", "Year", "sample_event", "crop")) %>%
   filter(!is.na(strips)) %>%
   mutate(ln_ppt = log(ppt_sum),
          diff = strips-control,
@@ -59,7 +59,7 @@ long_load <- pivot_sample %>%
   gather(Treatment, tss_load, control:strips) %>%
   arrange(Treatment, tss_load) %>%
   filter(!is.na(diff)) %>%
-  select(SiteID, Treatment, Year, sample_event, tss_load, diff, ppt_sum, crop.x)
+  select(SiteID, Treatment, Year, sample_event, tss_load, diff, ppt_sum, crop)
 
 ```
 
@@ -87,14 +87,13 @@ long_load <- long_load %>%
 
 ```{r full_dataframe, dependson = "random coding"}
 full_df <- rf_ro_pivot %>%
-  inner_join(ppt_sum,by=c("SiteID", "Year", "sample_event")) %>%
+  inner_join(ppt_sum,by=c("SiteID", "Year", "sample_event","crop")) %>%
   drop_na(tss_load) %>%
   mutate(ppt_sum = ppt_sum.x,
          ln_ppt = log(ppt_sum),
          ln_tss_load = log(tss_load+0.005322915),
-         Treatment = Treatment.x,
-         crop = crop.x) %>%
-  subset(select = -c(Treatment.y, Treatment.x, ppt_sum.x, ppt_sum.y, crop.x)) %>%
+         Treatment = Treatment.x) %>%
+  subset(select = -c(Treatment.y, Treatment.x, ppt_sum.x, ppt_sum.y)) %>%
   arrange(Year, SiteID, Treatment, sample_event)
 
 save(full_df, file = "full_df.RData")

@@ -1,5 +1,5 @@
 ---
-title: "Flume analysis"
+title: "Flume: Full Analysis"
 author: "Jessica Nelson"
 date: "`r Sys.Date()`"
 output:
@@ -23,9 +23,7 @@ library("emmeans")
 library("ggResidpanel")
 library("data.table")
 library("stringr")
-library("ggpubr")
-library("rstatix")
-library("broom")
+
 
 options(width = 120)
 
@@ -94,7 +92,7 @@ h <- ggplot(full_df, aes(x=ln_ppt, y=ln_tss_load, color=Treatment), inherit.aes 
   ggtitle("Log-log relationship between TSS load and rainfall accumulation \n(full dataset)") +
   theme(plot.title = element_text(size=14, face="bold",hjust = 0.5))
   
-
+h
 #ggsave("fig/randReg_ppt_load.png", h, width = 12, height = 12)
 
 ```
@@ -124,7 +122,7 @@ There are three main analyses of interest:
 m_flume <- lmerTest::lmer(log(tss_load+0.005322915) ~ 
                              (1 | SiteID) +
                              (1 | SiteID:Treatment) + 
-                            #(1|SiteID:Treatment:sample_event) +
+                            #(1|SiteID:Treatment:sample_event) + removed due to singular fit
                             
                              Treatment*ln_ppt + 
                             Treatment*crop +
@@ -176,6 +174,14 @@ crop      = emmeans(m_flume, pairwise ~ Treatment|crop,
 confint(crop)$contrasts
 
 ```
+# Check assumptions
+
+There are two possible models:
+
+- m_flume: full model design, design-based analysis
+- m_flume_model: model design selected based on backward step selection
+
+### Full model design
 
 ```{r design_model_residual_plots, dependson = "design_model"}
 resid_panel(m_flume, 
@@ -183,4 +189,13 @@ resid_panel(m_flume,
             smoother = TRUE, qqbands = TRUE)
 
 resid_xpanel(m_flume)
+```
+
+### Selected model design
+```{r design_step_residual_plots, dependson = "design_step_model"}
+resid_panel(m_flume_model, 
+            plots = c("resid","index","yvp","qq"),
+            smoother = TRUE, qqbands = TRUE)
+
+resid_xpanel(m_flume_model)
 ```
