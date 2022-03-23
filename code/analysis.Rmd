@@ -1,6 +1,6 @@
 ---
-title: "Soilpad analysis"
-author: "Jarad Niemi"
+title: "Flume analysis"
+author: "Jessica Nelson"
 date: "`r Sys.Date()`"
 output:
   pdf_document:
@@ -23,7 +23,6 @@ library("emmeans")
 library("ggResidpanel")
 library("data.table")
 library("stringr")
-#install.packages("rstatix")
 library("ggpubr")
 library("rstatix")
 library("broom")
@@ -42,16 +41,21 @@ sessionInfo()
 ```{r, child="sediment.Rmd"}
 ```
 
+
+```{r load, dependson= "full_dataframe"}
+load("full_df.RData")
+```
+
 ## Exploratory analysis
 
 ## Site-year with rainfall event
 
-```{r, dependson="create_sediment"}
-site_year_rfevent <- flume %>%
-  select(SiteID, Year, rf_event) %>%
+```{r, dependson="load"}
+site_year_rfevent <- full_df %>%
+  select(SiteID, Year, sample_event) %>%
   unique()
 
-ggplot(site_year_rfevent, aes(Year, SiteID, fill=rf_event)) +
+ggplot(site_year_rfevent, aes(Year, SiteID, fill=sample_event)) +
   geom_tile()
 ```
 
@@ -78,18 +82,17 @@ g <- ggplot(TSS_counts, aes(x = Year, y= SiteID, fill = n)) +
   theme(axis.text.x = element_text(angle = 45, hjust = 1))
 
 g 
-##ggsave("fig/soilpad_counts_no_diversion.png", g, width = 12, height = 12)
 ```
 
 
 ## Data visualization
 
-```{r, dependson="create_sediment"}
-#h <- ggplot(full_df, aes(x=ln_ppt, y=ln_tss_load, color=Treatment), inherit.aes = FALSE) +
-#  geom_point() + 
-#  geom_smooth(method=lm, se=FALSE, fullrange=TRUE) +
-#  ggtitle("Log-log relationship between TSS load and rainfall accumulation \n(full dataset)") +
-#  theme(plot.title = element_text(size=14, face="bold",hjust = 0.5))
+```{r, dependson="load"}
+h <- ggplot(full_df, aes(x=ln_ppt, y=ln_tss_load, color=Treatment), inherit.aes = FALSE) +
+  geom_point() + 
+  geom_smooth(method=lm, se=FALSE, fullrange=TRUE) +
+  ggtitle("Log-log relationship between TSS load and rainfall accumulation \n(full dataset)") +
+  theme(plot.title = element_text(size=14, face="bold",hjust = 0.5))
   
 
 #ggsave("fig/randReg_ppt_load.png", h, width = 12, height = 12)
@@ -97,12 +100,12 @@ g
 ```
 
 
-```{r, dependson="create_sediment"}
+#```{r, dependson="create_sediment"}
 #pivot_sample %>% 
 #  anova_test(ln_trt ~ ln_ppt*ln_ctl)
 ## purr https://stackoverflow.com/questions/50702152/compare-models-via-anova-with-purrr-or-dplyr
 ## anova() and may need an linear model built up.
-```
+#```
 
 
 # Main Analyses
@@ -117,11 +120,15 @@ There are three main analyses of interest:
 
 ### Treatment effect
 
-```{r design_model, dependson = "create_sediment"}
+```{r design_model, dependson = "load"}
 m_flume <- lmerTest::lmer(log(tss_load+0.005322915) ~ 
-                             #(1 | SiteID) +
+                             (1 | SiteID) +
                              (1 | SiteID:Treatment) + 
+                            #(1|SiteID:Treatment:sample_event) +
+                            
                              Treatment*ln_ppt + 
+                            Treatment*crop +
+                            
                             Year,
                           data = full_df)
 
@@ -140,23 +147,33 @@ summary(m_flume_model)
 
 
 ```{r design_model_contrasts, dependson = "design_model"}
-treatment = emmeans(m_flume, pairwise ~ Treatment, 
-                    type = "response", # calculated log ahead of time instead of in model; the minus indicates it didn't back transform; difference between control and strips on the log-scale. Exponentiate the tails of the ci and estimate. 
+trt_yr = emmeans(m_flume, pairwise ~ Treatment|Year, 
+                    type = "response",
                     lmer.df = "asymptotic") 
+confint(trt_yr)$contrasts
 
-confint(treatment)$contrasts
+trt = emmeans(m_flume, pairwise ~ Treatment, 
+                    type = "response", 
+                    lmer.df = "asymptotic")
+confint(trt)
 
 year = emmeans(m_flume, ~ Year, 
                     type = "response",
                     lmer.df = "asymptotic") 
 confint(year)
 
-treatment = emmeans(m_flume, pairwise ~ Treatment|ln_ppt,
+trt_ppt = emmeans(m_flume, pairwise ~ Treatment|ln_ppt,
                     at=list(ln_ppt=c(-4,-3,-2)), 
                     type = "response",
                     lmer.df = "asymptotic")
 
-confint(treatment)$contrasts ## exp. the values
+confint(trt_ppt)$contrasts ## exp. the values
+
+crop      = emmeans(m_flume, pairwise ~ Treatment|crop,   
+                    type = "response",
+                    lmer.df = "asymptotic")
+
+confint(crop)$contrasts
 
 ```
 
@@ -167,13 +184,3 @@ resid_panel(m_flume,
 
 resid_xpanel(m_flume)
 ```
-
-Possibly heavy-tailed residuals. 
-
-Non-constant variance amongst Site and Diversion. 
-
-
-### Ratio comparison
-
-
-List of PadIDs that had a diversion pair. 

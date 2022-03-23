@@ -103,35 +103,56 @@ There are three main analyses of interest:
 
 
 ```{r design_model, dependson = "flume_random"}
+#mR_flume <- lmerTest::lmer(log(tss_load+0.005322915) ~ 
+#                             #(1 | SiteID) +
+#                             (1 | SiteID:Treatment) + 
+#                             Treatment*ln_ppt +
+#                            Year,
+#                          data = flumeR)
+
 mR_flume <- lmerTest::lmer(log(tss_load+0.005322915) ~ 
-                             #(1 | SiteID) +
+                             (1 | SiteID) +
                              (1 | SiteID:Treatment) + 
-                             Treatment*ln_ppt +
+                            #(1|SiteID:Treatment:sample_event) +
+                            
+                             Treatment*ln_ppt + 
+                            Treatment*crop +
+                            
                             Year,
                           data = flumeR)
+
 summary(mR_flume)
 
 ```
 
 ```{r design_model_contrasts, dependson = "design_model"}
-treatmentR = emmeans(mR_flume, pairwise ~ Treatment, 
-                    type = "response", # calculated log ahead of time instead of in model; the minus indicates it didn't back transform; difference between control and strips on the log-scale. Exponentiate the tails of the ci and estimate. 
+trt_yrR = emmeans(mR_flume, pairwise ~ Treatment|Year, 
+                    type = "response",
                     lmer.df = "asymptotic") 
+confint(trt_yrR)$contrasts
 
-confint(treatmentR)$contrasts
+trtR    = emmeans(mR_flume, pairwise ~ Treatment, 
+                    type = "response", 
+                    lmer.df = "asymptotic")
+confint(trtR)
 
-treatment = emmeans(mR_flume, pairwise ~ Treatment|ln_ppt,
-                    at=list(ln_ppt=c(-3,-2, -1)), 
+yearR   = emmeans(mR_flume, ~ Year, 
+                    type = "response",
+                    lmer.df = "asymptotic") 
+confint(yearR)
+
+trt_pptR  = emmeans(mR_flume, pairwise ~ Treatment|ln_ppt,
+                    at=list(ln_ppt=c(-4,-3,-2)), 
                     type = "response",
                     lmer.df = "asymptotic")
 
-confint(treatment)$contrasts ## exp. the values
+confint(trt_pptR)$contrasts ## exp. the values
 
-year = emmeans(mR_flume, ~ Year,
+cropR      = emmeans(mR_flume, pairwise ~ Treatment|crop,   
                     type = "response",
                     lmer.df = "asymptotic")
 
-confint(year)## exp. the values
+confint(cropR)$contrasts
 ```
 
 
