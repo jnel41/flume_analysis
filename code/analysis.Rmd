@@ -46,7 +46,7 @@ load("full_df.RData")
 
 ## Exploratory analysis
 
-## Site-year with rainfall event
+## Site-year with sample event
 
 ```{r, dependson="load"}
 site_year_rfevent <- full_df %>%
@@ -57,15 +57,16 @@ ggplot(site_year_rfevent, aes(Year, SiteID, fill=sample_event)) +
   geom_tile()
 ```
 
+## Data visualization
 
 ## Number of samples
 
 Calculate the number of observations for each treatment-position-year-site-time
 combination. 
 
-```{r sample_event_counts, dependson="create_sediment"}
-TSS_counts <- flume %>%
-  group_by(Year, SiteID, rf_event) %>%
+```{r sample_event_counts, dependson="load"}
+TSS_counts <- full_df %>%
+  group_by(Year, SiteID, Treatment, crop, random) %>%
   distinct() %>%
   summarize(n = n(), .groups = "drop")
 ```
@@ -73,17 +74,15 @@ TSS_counts <- flume %>%
 Plot the number of observations for each combination. 
 
 ```{r plot_count, dependson="sample_event_counts", out.width = "\\textwidth"}
-g <- ggplot(TSS_counts, aes(x = Year, y= SiteID, fill = n)) +
+g = ggplot(TSS_counts, aes(x = Treatment, y = crop, fill = n)) +
   geom_tile() +
   geom_text(aes(label = n), color = "white") +
-  scale_fill_gradient(low = "blue", high = "red") +
+  facet_grid(SiteID + random ~ Year) +
+  scale_fill_gradient(low = "blue", high = "black") +
   theme(axis.text.x = element_text(angle = 45, hjust = 1))
 
 g 
 ```
-
-
-## Data visualization
 
 ```{r, dependson="load"}
 h <- ggplot(full_df, aes(x=ln_ppt, y=ln_tss_load, color=Treatment), inherit.aes = FALSE) +
@@ -97,6 +96,66 @@ h
 
 ```
 
+```{r mean_data, dependson = "load"}
+load_sum <- full_df %>%
+  group_by(Year, SiteID, Treatment, crop) %>%
+  summarize(sum_load             = sum(tss_load, na.rm = TRUE),
+            log_load = mean(log(sum_load), na.rm = TRUE),
+            n                   = n(),
+            .groups = "drop")
+
+
+ppt_sum <- flume %>%
+  group_by(Year, SiteID) %>%
+  summarize(sum_ppt             = sum(precipitation, na.rm = TRUE),
+            #log_load = mean(log(sum_load), na.rm = TRUE),
+            n                   = n(),
+            .groups = "drop")
+
+```
+
+```{r wp_plot, dependson = "plot_data", eval = FALSE, echo = FALSE}
+g <- ggplot(full_df, 
+           aes(x = sample_event, y = ln_tss_load, group=Treatment, color=Treatment)) + 
+  geom_line() +
+  geom_point() +
+  facet_grid(SiteID + random ~ Year) + 
+  #scale_y_log10() + 
+  labs(title ="Total load (log(kg/ha)) by each sample event") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+g
+
+#ggsave("fig/wp_plot.png", g)
+```
+
+```{r wp_per_day_plot, dependson = "plot_data"}
+g <- ggplot(load_sum, 
+           aes(x = Treatment, 
+               y = sum_load)) + 
+  geom_point() + 
+  geom_line() +
+  facet_grid(SiteID ~ Year, scales = "free_y") + 
+  #scale_y_log10() + 
+  labs(title ="Total load (kg/ha) per field season") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+g
+
+#ggsave("fig/wp_per_day_plot.png", g)
+```
+
+Average isn't realistic
+
+
+```{r strip_boxplot, dependson = "create_soilpad", eval = FALSE, echo = FALSE}
+g <- ggplot(flume, 
+           aes(x = Year, y = precipitation, color=crop)) + 
+  geom_boxplot() +
+  geom_point() + 
+  facet_grid( ~ SiteID) + 
+  #scale_y_log10() + 
+  theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5))
+g
+```
 
 #```{r, dependson="create_sediment"}
 #pivot_sample %>% 
@@ -142,6 +201,11 @@ summary(m_flume_model)
 ##https://campus.datacamp.com/courses/hierarchical-and-mixed-effects-models-in-r/linear-mixed-effect-models?ex=7
 ```
 
+```{r design_step_model, dependson = "design_model"}
+emmip(m_flume, ln_ppt ~ Treatment | Year)
+
+##https://campus.datacamp.com/courses/hierarchical-and-mixed-effects-models-in-r/linear-mixed-effect-models?ex=7
+```
 
 
 ```{r design_model_contrasts, dependson = "design_model"}
