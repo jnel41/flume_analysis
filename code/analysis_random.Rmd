@@ -118,15 +118,15 @@ There are three main analyses of interest:
 #                            Year,
 #                          data = flumeR)
 
-mR_flume <- lmerTest::lmer(log(tss_load+0.005322915) ~ 
+mR_flume <- lmerTest::lmer(log(tss_load+0.0053) ~ 
                              (1 | SiteID) +
-                             #(1 | SiteID:Treatment) + removed due to singular fit
-                          #1|SiteID:Treatment:sample_event) + removed due to singular fit
+                             (1 | SiteID:Treatment) + #removed due to singular fit
+                          #(1|SiteID:Treatment:sample_event) + #removed due to singular fit
                             
                              Treatment*ln_ppt + 
                             Treatment*crop +
                             
-                            Year,
+                            Year*Treatment,
                           data = flumeR)
 
 summary(mR_flume)
@@ -159,7 +159,7 @@ yearR   = emmeans(mR_flume, ~ Year,
 confint(yearR)
 
 trt_pptR  = emmeans(mR_flume, pairwise ~ Treatment|ln_ppt,
-                    at=list(ln_ppt=c(-4,-3,-2)), 
+                    at=list(ln_ppt=c(-4,-3,-2,-1,-0.25)), 
                     type = "response",
                     lmer.df = "asymptotic")
 

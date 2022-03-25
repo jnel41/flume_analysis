@@ -16,13 +16,14 @@ flume <- read_csv("../data/tidy/flume_event_data612_UPDATE.csv") %>%
   subset(subtreatment != 'grass strip') %>%
   subset(SiteID != 'MCN') %>%
   subset(subset=!(SiteID=="RHO" & Year == 2016)) %>%
-  subset(subset=!(SiteID=="RHO" & Year == 2017))
+  subset(subset=!(SiteID=="RHO" & Year == 2017)) %>%
+  subset(subset=!(SiteID == "WOR" & Year == 2018 & sample_event == 3))
+
 ```
 ```{r total, dependson="create_sediment"}
 flume_sum <- flume %>%
   group_by(Treatment, Year, SiteID, sample_event, tss_sum, crop) %>%
-  summarize(tss_load = tss_sum,
-            ln_tss_load = log(tss_load+0.000198)) %>%
+  summarize(tss_load = tss_sum) %>%
   distinct() 
 
 
@@ -51,7 +52,7 @@ pivot_sample <- sample_anova %>%
   mutate(ln_ppt = log(ppt_sum),
          diff = strips-control,
          ln_diff = log(abs(diff)+0.00165),
-         ln_ctl = log(control+0.005322915),
+         ln_ctl = log(control+0.0053),
          ln_trt = log(strips+0.0104)) %>%
   subset(select = -c(Treatment))
 
@@ -91,7 +92,7 @@ full_df <- rf_ro_pivot %>%
   drop_na(tss_load) %>%
   mutate(ppt_sum = ppt_sum.x,
          ln_ppt = log(ppt_sum),
-         ln_tss_load = log(tss_load+0.005322915),
+         ln_tss_load = log(tss_load+0.0053),
          Treatment = Treatment.x) %>%
   subset(select = -c(Treatment.y, Treatment.x, ppt_sum.x, ppt_sum.y)) %>%
   arrange(Year, SiteID, Treatment, sample_event)

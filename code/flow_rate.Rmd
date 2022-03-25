@@ -1,0 +1,52 @@
+---
+title: "Flume analysis"
+author: "JN"
+date: "`r Sys.Date()`"
+output: 
+  html_document: 
+    toc: true
+---
+
+```{r create_sediment, cache.extra=tools::md5sum("../data/tidy/flume_event_data612_UPDATE.csv")}
+
+library("tidyverse")
+
+df <- read_csv("../data/tidy/flume_event_data612_UPDATE.csv") %>%
+  mutate(Year = factor(Year)) %>%
+  subset(subtreatment != 'grass strip') %>%
+  subset(SiteID != 'MCN') %>%
+  subset(subset=!(SiteID=="RHO" & Year == 2016)) %>%
+  subset(subset=!(SiteID=="RHO" & Year == 2017)) %>%
+  subset(subset=!(SiteID == "WOR" & Year == 2018 & sample_event == 3)) %>%
+  group_by(Treatment, Year, SiteID, sample_event, crop) %>%
+  summarize(ppt_sum = sum(precipitation)*1000,
+            ppt_time = sum(rain_time),
+            tss_load = tss_sum,
+            flow_time = flow_time) %>%
+  ungroup() %>%
+  filter(!duplicated(cbind(Year, SiteID, sample_event, Treatment))) %>%
+  mutate(load_rate = (tss_load/(flow_time/60)),
+         ppt_rate = (ppt_sum)/(ppt_time/60)) %>%
+  mutate_at(vars(load_rate), ~replace_na(., 0))
+  
+
+```
+
+```{r random coding, dependson = "pivot tables"}
+rf_ro_df <- df %>%
+  mutate(random = (ifelse(SiteID == 'ARM', 'NR',
+  ifelse(SiteID == 'EIA', 'R',
+  ifelse(SiteID == 'MCN', 'R', 
+  ifelse(SiteID == 'HOE', 'NR',
+  ifelse(SiteID == 'MAR', 'NR',
+  ifelse(SiteID == 'RHO', 'R',
+  ifelse(SiteID == 'WHI', 'NR',
+  ifelse(SiteID == 'WOR', 'R', 0))))))))))
+
+```
+
+```{r full_dataframe, dependson = "random coding"}
+
+save(rf_ro_df, file = "df_rate.RData")
+#write.csv(full_df,"D:/ISU/ResearchProject/flume_analysis/data/tidy/full_df.csv", row.names = FALSE)
+```

@@ -1,5 +1,6 @@
 ---
 title: "Flume: Full Analysis"
+subtitle: "(adapted from Jarad Niemi - Soilpad Analysis)"
 author: "Jessica Nelson"
 date: "`r Sys.Date()`"
 output:
@@ -116,12 +117,12 @@ ppt_sum <- flume %>%
 
 ```{r wp_plot, dependson = "plot_data", eval = FALSE, echo = FALSE}
 g <- ggplot(full_df, 
-           aes(x = sample_event, y = ln_tss_load, group=Treatment, color=Treatment)) + 
+           aes(x = ln_ppt, y = ln_tss_load, group=Treatment, color=Treatment)) + 
   geom_line() +
   geom_point() +
   facet_grid(SiteID + random ~ Year) + 
   #scale_y_log10() + 
-  labs(title ="Total load (log(kg/ha)) by each sample event") +
+  labs(title ="Total load (log(kg/ha)) by rainfall accumulation per sample event (log(m))") +
   theme(axis.text.x = element_text(angle = 45, hjust = 1))
 g
 
@@ -151,6 +152,7 @@ g <- ggplot(flume,
            aes(x = Year, y = precipitation, color=crop)) + 
   geom_boxplot() +
   geom_point() + 
+  #geom_jitter() +
   facet_grid( ~ SiteID) + 
   #scale_y_log10() + 
   theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5))
@@ -178,15 +180,15 @@ There are three main analyses of interest:
 ### Treatment effect
 
 ```{r design_model, dependson = "load"}
-m_flume <- lmerTest::lmer(log(tss_load+0.005322915) ~ 
+m_flume <- lmerTest::lmer(log(tss_load+0.0053) ~ 
                              (1 | SiteID) +
                              (1 | SiteID:Treatment) + 
-                            #(1|SiteID:Treatment:sample_event) + removed due to singular fit
+                            #(1|SiteID:Treatment:sample_event) + #removed due to singular fit
                             
                              Treatment*ln_ppt + 
                             Treatment*crop +
                             
-                            Year,
+                            Year*Treatment,
                           data = full_df)
 
 summary(m_flume)
@@ -201,11 +203,11 @@ summary(m_flume_model)
 ##https://campus.datacamp.com/courses/hierarchical-and-mixed-effects-models-in-r/linear-mixed-effect-models?ex=7
 ```
 
-```{r design_step_model, dependson = "design_model"}
-emmip(m_flume, ln_ppt ~ Treatment | Year)
+#```{r design_step_model, dependson = "design_model"}
+#emmip(m_flume, ln_ppt ~ Treatment | Year)
 
 ##https://campus.datacamp.com/courses/hierarchical-and-mixed-effects-models-in-r/linear-mixed-effect-models?ex=7
-```
+#```
 
 
 ```{r design_model_contrasts, dependson = "design_model"}
@@ -225,7 +227,7 @@ year = emmeans(m_flume, ~ Year,
 confint(year)
 
 trt_ppt = emmeans(m_flume, pairwise ~ Treatment|ln_ppt,
-                    at=list(ln_ppt=c(-4,-3,-2)), 
+                    at=list(ln_ppt=c(-4,-3.5,-3,-2)), 
                     type = "response",
                     lmer.df = "asymptotic")
 
