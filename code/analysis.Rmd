@@ -43,6 +43,8 @@ sessionInfo()
 
 ```{r load, dependson= "full_dataframe"}
 load("full_df.RData")
+
+
 ```
 
 ## Exploratory analysis
@@ -186,10 +188,10 @@ m_flume <- lmerTest::lmer(log(tss_load+0.0053) ~
                             
                             Year*Treatment +
                             
-                            (1 | SiteID) +
+                            #(1 | SiteID) + #removed due to singular fit
                              (1 | SiteID:Treatment) + 
-                            (1|Year:sample_event) + #consider this and above with SiteID 
-                            (1|SiteID:Year:sample_event), #removed due to singular fit
+                            #(1|Year:sample_event) + #consider this and below with SiteID 
+                            (1|SiteID:Year:sample_event), 
                           
                           data = full_df)
 

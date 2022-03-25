@@ -119,14 +119,15 @@ There are three main analyses of interest:
 #                          data = flumeR)
 
 mR_flume <- lmerTest::lmer(log(tss_load+0.0053) ~ 
-                             (1 | SiteID) +
-                             (1 | SiteID:Treatment) + #removed due to singular fit
-                          #(1|SiteID:Treatment:sample_event) + #removed due to singular fit
-                            
                              Treatment*ln_ppt + 
                             Treatment*crop +
+                            Year*Treatment +
                             
-                            Year*Treatment,
+                            (1 | SiteID) + 
+                             #(1 | SiteID:Treatment) + #removed due to singular fit
+                            #(1|Year:sample_event) + #removed due to singular fit
+                            (1|SiteID:Year:sample_event), 
+                           
                           data = flumeR)
 
 summary(mR_flume)
@@ -169,7 +170,7 @@ cropR      = emmeans(mR_flume, pairwise ~ Treatment|crop,
                     type = "response",
                     lmer.df = "asymptotic")
 
-confint(cropR)$contrasts
+confint(cropR)
 ```
 # Check assumptions
 

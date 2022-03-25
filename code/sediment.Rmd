@@ -93,7 +93,7 @@ full_df <- rf_ro_pivot %>%
   mutate(ppt_sum = ppt_sum.x,
          ln_ppt = log(ppt_sum),
          ln_tss_load = log(tss_load+0.0053),
-         Treatment = Treatment.x) %>%
+         Treatment = factor(Treatment.x, levels=c('strips','control'))) %>%
   subset(select = -c(Treatment.y, Treatment.x, ppt_sum.x, ppt_sum.y)) %>%
   arrange(Year, SiteID, Treatment, sample_event)
 
