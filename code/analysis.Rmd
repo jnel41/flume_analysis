@@ -181,14 +181,16 @@ There are three main analyses of interest:
 
 ```{r design_model, dependson = "load"}
 m_flume <- lmerTest::lmer(log(tss_load+0.0053) ~ 
-                             (1 | SiteID) +
-                             (1 | SiteID:Treatment) + 
-                            #(1|SiteID:Treatment:sample_event) + #removed due to singular fit
-                            
                              Treatment*ln_ppt + 
                             Treatment*crop +
                             
-                            Year*Treatment,
+                            Year*Treatment +
+                            
+                            (1 | SiteID) +
+                             (1 | SiteID:Treatment) + 
+                            (1|Year:sample_event) + #consider this and above with SiteID 
+                            (1|SiteID:Year:sample_event), #removed due to singular fit
+                          
                           data = full_df)
 
 summary(m_flume)
