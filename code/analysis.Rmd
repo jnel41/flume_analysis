@@ -115,6 +115,11 @@ ppt_sum <- flume %>%
             n                   = n(),
             .groups = "drop")
 
+TSS_sum <- full_df %>%
+  group_by(Year, SiteID, Treatment) %>%
+  distinct() %>%
+  summarize(tss_sum = sum(tss_load), .groups = "drop")
+
 ```
 
 ```{r wp_plot, dependson = "plot_data", eval = FALSE, echo = FALSE}
@@ -182,9 +187,8 @@ There are three main analyses of interest:
 ### Treatment effect
 
 ```{r design_model, dependson = "load"}
-m_flume <- lmerTest::lmer(log(tss_load+0.0053) ~ 
-                             Treatment*ln_ppt + 
-                            Treatment*crop +
+m_flume <- lmerTest::lmer(log(tss_load+0.00053) ~ 
+                             Treatment*ln_ppt +
                             
                             Year*Treatment +
                             
@@ -237,13 +241,43 @@ trt_ppt = emmeans(m_flume, pairwise ~ Treatment|ln_ppt,
 
 confint(trt_ppt)$contrasts ## exp. the values
 
-crop      = emmeans(m_flume, pairwise ~ Treatment|crop,   
-                    type = "response",
-                    lmer.df = "asymptotic")
+#crop      = emmeans(m_flume, pairwise ~ Treatment|crop,   
+#                    type = "response",
+#                    lmer.df = "asymptotic")
 
-confint(crop)$contrasts
+#confint(crop)$contrasts
 
 ```
+
+```{r diversion_figure, dependson="diversion_contrasts"}
+trt <- as.data.frame(trt)
+
+k <- trt %>%
+  filter(contrast != "strips - control")
+
+trt_plot <- k %>%
+  ggplot(aes(x=Treatment, y=response, fill=Treatment))+
+  geom_bar(width = 0.5, position = position_dodge(), stat="summary") +
+  geom_errorbar(aes(ymin = (response-SE), ymax = (response+SE)),
+            width = 0.2,
+            linetype = "solid",
+            position = position_dodge(width = 0.5),
+            color="black", size=0.7) +
+  scale_fill_manual(values = c("control" = "#176D9C",
+                               "strips" = "#C38820")) +
+  ggtitle("Comparison of Total Suspended Sediment (TSS) loads") +
+  xlab("Treatment") +
+  ylab("TSS Load \n(Mg/ha))") +
+  theme(plot.title = element_text(size=28, face="bold", hjust=0.5),
+        axis.title.x = element_text(size=20, face="bold"),
+        axis.title.y = element_text(size=20, face="bold"),
+        axis.text.x = element_text(size=20),
+        axis.text.y = element_text(size=20)) +
+  scale_x_discrete(labels= c("Control", "Prairie Strip"))
+
+trt_plot
+```
+
 # Check assumptions
 
 There are two possible models:

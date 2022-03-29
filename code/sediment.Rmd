@@ -91,6 +91,7 @@ full_df <- rf_ro_pivot %>%
   inner_join(ppt_sum,by=c("SiteID", "Year", "sample_event","crop")) %>%
   drop_na(tss_load) %>%
   mutate(ppt_sum = ppt_sum.x,
+         #load_Mg = tss_load*0.001,
          ln_ppt = log(ppt_sum),
          ln_tss_load = log(tss_load+0.0053),
          Treatment = factor(Treatment.x, levels=c('strips','control'))) %>%

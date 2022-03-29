@@ -74,6 +74,14 @@ TSS_countsR <- flumeR %>%
   summarize(n = n(), .groups = "drop")
 ```
 
+
+```{r year_tss_sum, dependson="flume_random"}
+TSS_sumR <- flumeR %>%
+  group_by(Year, SiteID, Treatment) %>%
+  distinct() %>%
+  summarize(tss_sum = sum(tss_load), .groups = "drop")
+```
+
 Plot the number of observations for each combination. 
 
 ```{r plot_count, dependson="sample_event_counts", out.width = "\\textwidth"}
@@ -119,12 +127,11 @@ There are three main analyses of interest:
 #                          data = flumeR)
 
 mR_flume <- lmerTest::lmer(log(tss_load+0.0053) ~ 
-                             Treatment*ln_ppt + 
-                            Treatment*crop +
+                             Treatment*ln_ppt +
                             Year*Treatment +
                             
                             (1 | SiteID) + 
-                             #(1 | SiteID:Treatment) + #removed due to singular fit
+                             (1 | SiteID:Treatment) + #removed due to singular fit
                             #(1|Year:sample_event) + #removed due to singular fit
                             (1|SiteID:Year:sample_event), 
                            
@@ -166,11 +173,11 @@ trt_pptR  = emmeans(mR_flume, pairwise ~ Treatment|ln_ppt,
 
 confint(trt_pptR)$contrasts ## exp. the values
 
-cropR      = emmeans(mR_flume, pairwise ~ Treatment|crop,   
-                    type = "response",
-                    lmer.df = "asymptotic")
+#cropR      = emmeans(mR_flume, pairwise ~ Treatment|crop,   
+#                    type = "response",
+#                    lmer.df = "asymptotic")
 
-confint(cropR)
+#confint(cropR)
 ```
 # Check assumptions
 
