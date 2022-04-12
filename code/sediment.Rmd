@@ -15,6 +15,7 @@ flume <- read_csv("../data/tidy/flume_event_data612_UPDATE.csv") %>%
   mutate(Year = factor(Year)) %>%
   subset(subtreatment != 'grass strip') %>%
   subset(SiteID != 'MCN') %>%
+  subset(SiteID != 'MAR') %>%
   subset(subset=!(SiteID=="RHO" & Year == 2016)) %>%
   subset(subset=!(SiteID=="RHO" & Year == 2017)) %>%
   subset(subset=!(SiteID == "WOR" & Year == 2018 & sample_event == 3))
@@ -28,7 +29,7 @@ flume_sum <- flume %>%
 
 
 ppt_sum <- flume %>%
-  group_by(Treatment, Year, SiteID, sample_event, crop) %>%
+  group_by(Treatment, Year, SiteID, sample_event, crop,LSfact, slope_75) %>%
   summarize(ppt_sum = sum(precipitation)) %>%
   ungroup() %>%
   filter(!duplicated(cbind(Year, SiteID, sample_event)))
@@ -70,20 +71,20 @@ rf_ro_pivot <- long_load %>%
   ifelse(SiteID == 'EIA', 'R',
   ifelse(SiteID == 'MCN', 'R', 
   ifelse(SiteID == 'HOE', 'NR',
-  ifelse(SiteID == 'MAR', 'NR',
+  #ifelse(SiteID == 'MAR', 'NR',
   ifelse(SiteID == 'RHO', 'R',
   ifelse(SiteID == 'WHI', 'NR',
-  ifelse(SiteID == 'WOR', 'R', 0))))))))))
+  ifelse(SiteID == 'WOR', 'R', 0)))))))))
 
 long_load <- long_load %>%
   mutate(random = (ifelse(SiteID == 'ARM', 'NR',
   ifelse(SiteID == 'EIA', 'R',
   ifelse(SiteID == 'MCN', 'R', 
   ifelse(SiteID == 'HOE', 'NR',
-  ifelse(SiteID == 'MAR', 'NR',
+  #ifelse(SiteID == 'MAR', 'NR',
   ifelse(SiteID == 'RHO', 'R',
   ifelse(SiteID == 'WHI', 'NR',
-  ifelse(SiteID == 'WOR', 'R', 0))))))))))
+  ifelse(SiteID == 'WOR', 'R', 0)))))))))
 ```
 
 ```{r full_dataframe, dependson = "random coding"}
@@ -99,4 +100,6 @@ full_df <- rf_ro_pivot %>%
 
 save(full_df, file = "full_df.RData")
 #write.csv(full_df,"D:/ISU/ResearchProject/flume_analysis/data/tidy/full_df.csv", row.names = FALSE)
+
+#write.csv(full_df,"D:/ISU/Project/SoilMove/data/statistics/flume_analysis/data/tidy/full_df.csv", row.names = FALSE)
 ```

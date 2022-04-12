@@ -7,9 +7,13 @@ library("data.table")
 library("stringr")
 library("lubridate")
 
-runoff$SiteID <- toupper(str_sub(runoff$watershed,1,3))
-runoff$Treatment <- str_sub(runoff$watershed,-3)
-ro <- runoff %>%
+#runoff$SiteID <- toupper(str_sub(runoff$watershed,1,3))
+d$SiteID <- toupper(str_sub(d$watershed,1,3))
+
+#runoff$Treatment <- str_sub(runoff$watershed,-3)
+d$Treatment <- str_sub(d$watershed,-3)
+
+ro <- d %>%
   mutate(Treatment = recode(Treatment,'ctl' = "control", 
                                     'trt' ="strips", 
                                    .default = "control"),
@@ -38,7 +42,7 @@ runoff_events <- e %>%
   arrange(Treatment, date) %>%                              #sorting
   filter(flow != "NA")                                                                                        #removing NA’s
 
-write_csv(runoff_events,"./data/tidy/runoff_events.csv")
+write_csv(runoff_events,"./data/tidy/clipped_runoff_events.csv")
 
 sample <- ro %>%
   filter(sampleID != "NA") %>%                                      

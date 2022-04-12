@@ -1,0 +1,102 @@
+---
+title: "Flume analysis"
+author: "JN"
+date: "`r Sys.Date()`"
+output: 
+  html_document: 
+    toc: true
+---
+
+```{r create_sediment, cache.extra=tools::md5sum("../data/tidy/flume_event_data612_UPDATE.csv")}
+
+library("tidyverse")
+
+flume <- read_csv("../data/tidy/flume_event_data612_UPDATE.csv") %>%
+  mutate(Year = factor(Year)) %>%
+  subset(subtreatment != 'grass strip') %>%
+  subset(SiteID != 'MCN') %>%
+  subset(subset=!(SiteID=="RHO" & Year == 2016)) %>%
+  subset(subset=!(SiteID=="RHO" & Year == 2017)) %>%
+  subset(subset=!(SiteID == "WOR" & Year == 2018 & sample_event == 3))
+
+```
+```{r total, dependson="create_sediment"}
+flume_sum <- flume %>%
+  group_by(Treatment, Year, SiteID, sample_event, tss_sum, crop) %>%
+  summarize(tss_load = tss_sum) %>%
+  distinct() 
+
+
+ppt_sum <- flume %>%
+  group_by(Treatment, Year, SiteID, sample_event, crop) %>%
+  summarize(ppt_sum = sum(precipitation)) %>%
+  ungroup() %>%
+  filter(!duplicated(cbind(Year, SiteID, sample_event)))
+
+```
+
+
+```{r pivot tables, dependson = "total"}
+sample_anova <- flume_sum %>%
+  filter(!is.na(tss_sum)) %>%
+  select(Year, SiteID, Treatment, sample_event, tss_sum, crop) %>%
+  group_by(SiteID, Year, Treatment, sample_event, crop) %>%
+    summarize(tss_load = sum(tss_sum)) %>% 
+  ungroup() %>%
+  select(Year, SiteID, Treatment, sample_event, tss_load, crop) %>%
+  pivot_wider(names_from = Treatment, values_from = tss_load)
+
+pivot_sample <- sample_anova %>%
+  inner_join(ppt_sum,by=c("SiteID", "Year", "sample_event", "crop")) %>%
+  filter(!is.na(strips)) %>%
+  mutate(ln_ppt = log(ppt_sum),
+         diff = strips-control,
+         ln_diff = log(abs(diff)+0.00165),
+         ln_ctl = log(control+0.0053),
+         ln_trt = log(strips+0.0104)) %>%
+  subset(select = -c(Treatment))
+
+long_load <- pivot_sample %>%
+  gather(Treatment, tss_load, control:strips) %>%
+  arrange(Treatment, tss_load) %>%
+  filter(!is.na(diff)) %>%
+  select(SiteID, Treatment, Year, sample_event, tss_load, diff, ppt_sum, crop)
+
+```
+
+```{r random coding, dependson = "pivot tables"}
+rf_ro_pivot <- long_load %>%
+  mutate(random = (ifelse(SiteID == 'ARM', 'NR',
+  ifelse(SiteID == 'EIA', 'R',
+  ifelse(SiteID == 'MCN', 'R', 
+  ifelse(SiteID == 'HOE', 'NR',
+  ifelse(SiteID == 'MAR', 'NR',
+  ifelse(SiteID == 'RHO', 'R',
+  ifelse(SiteID == 'WHI', 'NR',
+  ifelse(SiteID == 'WOR', 'R', 0))))))))))
+
+long_load <- long_load %>%
+  mutate(random = (ifelse(SiteID == 'ARM', 'NR',
+  ifelse(SiteID == 'EIA', 'R',
+  ifelse(SiteID == 'MCN', 'R', 
+  ifelse(SiteID == 'HOE', 'NR',
+  ifelse(SiteID == 'MAR', 'NR',
+  ifelse(SiteID == 'RHO', 'R',
+  ifelse(SiteID == 'WHI', 'NR',
+  ifelse(SiteID == 'WOR', 'R', 0))))))))))
+```
+
+```{r full_dataframe, dependson = "random coding"}
+full_df <- rf_ro_pivot %>%
+  inner_join(ppt_sum,by=c("SiteID", "Year", "sample_event","crop")) %>%
+  drop_na(tss_load) %>%
+  mutate(ppt_sum = ppt_sum.x,
+         ln_ppt = log(ppt_sum),
+         ln_tss_load = log(tss_load+0.0053),
+         Treatment = factor(Treatment.x, levels = c("strips","control"))) %>%
+  subset(select = -c(Treatment.y, Treatment.x, ppt_sum.x, ppt_sum.y)) %>%
+  arrange(Year, SiteID, Treatment, sample_event)
+
+save(full_df, file = "full_df.RData")
+#write.csv(full_df,"D:/ISU/ResearchProject/flume_analysis/data/tidy/full_df.csv", row.names = FALSE)
+```
