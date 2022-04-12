@@ -219,11 +219,7 @@ m_flume <- lmerTest::lmer(log(tss_load+0.00053) ~
                             
                             Year*Treatment +
                             
-<<<<<<< HEAD
-                            #(1 | SiteID) +
-=======
                             #(1 | SiteID) + #removed due to singular fit
->>>>>>> 377ecba5edb31eb43d6d2219dd565fe0e9c8e208
                              (1 | SiteID:Treatment) + 
                             #(1|Year:sample_event) + #consider this and below with SiteID 
                             (1|SiteID:Year:sample_event), 

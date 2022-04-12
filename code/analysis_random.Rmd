@@ -119,22 +119,9 @@ There are three main analyses of interest:
 
 
 ```{r designR_model, dependson = "flume_random"}
-#mR_flume <- lmerTest::lmer(log(tss_load+0.005322915) ~ 
-#                             #(1 | SiteID) +
-#                             (1 | SiteID:Treatment) + 
-#                             Treatment*ln_ppt +
-#                            Year,
-#                          data = flumeR)
-
-mR_flume <- lmerTest::lmer(log(tss_load+0.0053) ~ 
-<<<<<<< HEAD
-                             (1 | SiteID) +
-                             (1 | SiteID:Treatment) + #removed due to singular fit
-                          (1|SiteID:Treatment:sample_event) + #removed due to singular fit
-=======
+mR_flume <- lmerTest::lmer(log(tss_load+0.00053) ~ 
                              Treatment*ln_ppt +
                             Year*Treatment +
->>>>>>> 377ecba5edb31eb43d6d2219dd565fe0e9c8e208
                             
                             (1 | SiteID) + 
                              (1 | SiteID:Treatment) + #removed due to singular fit

@@ -21,6 +21,7 @@ flume <- read_csv("../data/tidy/flume_event_data612_UPDATE.csv") %>%
   subset(subset=!(SiteID == "WOR" & Year == 2018 & sample_event == 3))
 
 ```
+
 ```{r total, dependson="create_sediment"}
 flume_sum <- flume %>%
   group_by(Treatment, Year, SiteID, sample_event, tss_sum, crop) %>%
@@ -100,11 +101,7 @@ full_df <- rf_ro_pivot %>%
   arrange(Year, SiteID, Treatment, sample_event)
 
 save(full_df, file = "full_df.RData")
-<<<<<<< HEAD
+
 #write.csv(full_df,"D:/ISU/ResearchProject/flume_analysis/data/tidy/full_df.csv", row.names = FALSE)
 
-#write.csv(full_df,"D:/ISU/Project/SoilMove/data/statistics/flume_analysis/data/tidy/full_df.csv", row.names = FALSE)
-=======
-write.csv(full_df,"D:/ISU/ResearchProject/flume_analysis/data/tidy/full_df.csv", row.names = FALSE)
->>>>>>> 377ecba5edb31eb43d6d2219dd565fe0e9c8e208
 ```
