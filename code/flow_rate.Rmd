@@ -15,6 +15,7 @@ df <- read_csv("../data/tidy/flume_event_data612_UPDATE.csv") %>%
   mutate(Year = factor(Year)) %>%
   subset(subtreatment != 'grass strip') %>%
   subset(SiteID != 'MCN') %>%
+  subset(SiteID != 'MAR') %>%
   subset(subset=!(SiteID=="RHO" & Year == 2016)) %>%
   subset(subset=!(SiteID=="RHO" & Year == 2017)) %>%
   subset(subset=!(SiteID == "WOR" & Year == 2018 & sample_event == 3)) %>%

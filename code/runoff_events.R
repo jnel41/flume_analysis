@@ -45,5 +45,5 @@ sample <- ro %>%
   select(date, SiteID, Treatment, Year, sampleID) %>%
   mutate(julian = yday(date))
 
-write.csv(runoff,"./data/tidy/runoff.csv", row.names = FALSE)
+#write.csv(runoff,"./data/tidy/runoff.csv", row.names = FALSE)
 
