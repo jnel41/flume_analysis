@@ -28,7 +28,11 @@ event <- df %>%
                          'marsh' = 'MAR',
                          .default = 'site'),
          date_time = as.POSIXct(date_time, format = "%m/%d/%Y %H:%M"),
-         Year = as.numeric(format(date_time, "%Y"))) %>%
+         Year = as.numeric(format(date_time, "%Y")),
+         Treatment = recode(treatment, 
+                            'treatment' = 'strips',
+                            'rain' = 'rain',
+                            .default= 'control')) %>%
   subset(Treatment != "rain") %>%
   ungroup() %>%
   select('SiteID','Treatment','date_time', 'rain', 'Year','level','flow','watershed','sampleID')
@@ -60,6 +64,7 @@ load_cumulative <- load %>%
   summarize(tss_sum = sum(tss_kg_ha)) %>%
   subset(tss_sum > 0.000003977139) # sample 3010 is below detecable limit https://beta-static.fishersci.com/content/dam/fishersci/en_US/documents/programs/scientific/technical-documents/white-papers/apha-total-suspended-solids-procedure-white-paper.pdf
 
+write.csv(load_cumulative, "./data/tidy/load_event.csv",  row.names = FALSE)
 
 
 ### Rain event calculation
@@ -131,7 +136,7 @@ ro_flags <- event %>%
   mutate(eventflag = ifelse(roflag == 1,1, 
                             ifelse(roflag == 0 & rolength < 144, 1,0))) %>% #72 entries or at least 12 hours (Virginia) of dry between wet events
   mutate(eventflag = ifelse(row_number() < 144 & roflag == 0, 0, eventflag)) %>%
-  mutate(eventid = rep(seq(1,length(rle(eventflag)$lengths)), rle(eventflag)$lengths)) ## **manual edit WOR 2019 RO 4)
+  mutate(eventid = rep(seq(1,length(rle(eventflag)$lengths)), rle(eventflag)$lengths)) 
 
 ro_event <- ro_flags %>% 
   # Select only the rain events
@@ -146,26 +151,30 @@ ro_event <- ro_flags %>%
   # Compute time difference as duration of event, add 1 hour, knowing that the timestamp is the time when the rain record ends
   mutate(flow_time = as.numeric(difftime(eventEnd,eventStart, units = 'm')) + 1)
 
-write.csv(ro_event, "./data/tidy/runoff_event12.csv",  row.names = FALSE)
+## **manual edit WOR 2018 RO 4 (WQ samples: 3010, 3016, 3019, 3027, 3030, 3035, 3039, 3044)**
+write.csv(ro_event, "./data/tidy/runoff_event12.csv",  row.names = FALSE) 
 
 
 ## Sample+Runoff event calculation
-ro_times <- ro_event
+ro_times <- read.csv("./data/tidy/runoff_event12.csv")
 
 ro_newtimes <- ro_times %>%
+  mutate(Treatment = recode(Treatment, 
+                     'treatment' = 'strips', 
+                     .default= 'control')) %>%
   group_by(SiteID, Year, Treatment, eventid, flow, flow_time) %>%
   do(add_dates(.)) %>%
   ungroup()
 
 
 ro_joined <- ro_newtimes %>% 
-  left_join(load, by = c("SiteID","Treatment", "date_time")) %>%
+  left_join(load, by = c("SiteID", "Treatment", "date_time")) %>%
   group_by(SiteID, Treatment, Year.x, eventid, flow_time) %>% 
-  ungroup() %>%
   mutate(ro_event = eventid,
-         Year = Year.x) %>%
-  drop_na(sampleID) %>%
-  select(SiteID, Year, Treatment, flow, flow_time, date_time, sampleID, tss_kg_ha, area_ha, ro_event)
+         Year = Year.x) #%>%
+  #drop_na(sampleID) %>%
+  #ungroup() %>%
+  #select(SiteID, Year, Treatment, flow, flow_time, date_time, sampleID, tss_kg_ha, area_ha, ro_event)
 
 ro_cumulative <- ro_joined %>%
   group_by(Year, SiteID, ro_event, Treatment, flow, flow_time, sampleID) %>% 
