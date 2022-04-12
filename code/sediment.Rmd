@@ -50,11 +50,11 @@ sample_anova <- flume_sum %>%
 pivot_sample <- sample_anova %>%
   inner_join(ppt_sum,by=c("SiteID", "Year", "sample_event", "crop")) %>%
   filter(!is.na(strips)) %>%
-  mutate(ln_ppt = log(ppt_sum),
-         diff = strips-control,
-         ln_diff = log(abs(diff)+0.00165),
-         ln_ctl = log(control+0.0053),
-         ln_trt = log(strips+0.0104)) %>%
+  mutate(ln_ppt = log(ppt_sum)) %>%
+         #diff = strips-control,
+         #ln_diff = log(abs(diff)+0.00165),
+         #ln_ctl = log(control+0.0053),
+         #ln_trt = log(strips+0.0104)) %>%
   subset(select = -c(Treatment))
 
 long_load <- pivot_sample %>%
@@ -92,14 +92,19 @@ full_df <- rf_ro_pivot %>%
   inner_join(ppt_sum,by=c("SiteID", "Year", "sample_event","crop")) %>%
   drop_na(tss_load) %>%
   mutate(ppt_sum = ppt_sum.x,
+         #load_Mg = tss_load*0.001,
          ln_ppt = log(ppt_sum),
          ln_tss_load = log(tss_load+0.0053),
-         Treatment = Treatment.x) %>%
+         Treatment = factor(Treatment.x, levels=c('strips','control'))) %>%
   subset(select = -c(Treatment.y, Treatment.x, ppt_sum.x, ppt_sum.y)) %>%
   arrange(Year, SiteID, Treatment, sample_event)
 
 save(full_df, file = "full_df.RData")
+<<<<<<< HEAD
 #write.csv(full_df,"D:/ISU/ResearchProject/flume_analysis/data/tidy/full_df.csv", row.names = FALSE)
 
 #write.csv(full_df,"D:/ISU/Project/SoilMove/data/statistics/flume_analysis/data/tidy/full_df.csv", row.names = FALSE)
+=======
+write.csv(full_df,"D:/ISU/ResearchProject/flume_analysis/data/tidy/full_df.csv", row.names = FALSE)
+>>>>>>> 377ecba5edb31eb43d6d2219dd565fe0e9c8e208
 ```
