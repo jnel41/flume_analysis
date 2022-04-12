@@ -1,11 +1,13 @@
 library("tidyverse"); theme_set(theme_bw())
-library("lme4")
-library("lmerTest")
-library("emmeans")
-library("ggResidpanel")
+#library("lme4")
+#library("lmerTest")
+#library("emmeans")
+#library("ggResidpanel")
 library("data.table")
 library("stringr")
 library("lubridate")
+
+load(file="./data/raw/flume/clippedrainandflowdataallyears.rds")
 
 #runoff$SiteID <- toupper(str_sub(runoff$watershed,1,3))
 d$SiteID <- toupper(str_sub(d$watershed,1,3))
