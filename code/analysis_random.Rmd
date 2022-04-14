@@ -1,5 +1,6 @@
 ---
 title: "Flume: Random Analysis (March-November)"
+subtitle: "(adapted from Jarad Niemi - Soilpad Analysis)"
 author: "Jessica Nelson"
 date: "`r Sys.Date()`"
 output:
@@ -98,7 +99,7 @@ g
 ## Data visualization
 
 ```{r, dependson="flume_random"}
-hR <- ggplot(flumeR, aes(x=ln_ppt, y=ln_tss_load, color=Treatment)) +
+hR <- ggplot(flumeR, aes(x=ln_ppt, y=log(tss_load+0.0016488035), color=Treatment)) +
   geom_point() + 
   geom_smooth(method=lm, se=FALSE, fullrange=TRUE) +
   ggtitle("Log-log relationship between TSS load and rainfall accumulation \n(random dataset)") +
@@ -119,7 +120,7 @@ There are three main analyses of interest:
 
 
 ```{r designR_model, dependson = "flume_random"}
-mR_flume <- lmerTest::lmer(log(tss_load+0.00053) ~ 
+mR_flume <- lmerTest::lmer(log(tss_load+0.0016488035) ~ 
                              Treatment*ln_ppt +
                             Year*Treatment +
                             

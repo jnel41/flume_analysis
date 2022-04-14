@@ -45,7 +45,6 @@ sessionInfo()
 ```{r load, dependson= "full_dataframe"}
 load("full_df.RData")
 
-
 ```
 
 ## Exploratory analysis
@@ -91,24 +90,15 @@ g
 ```{r, dependson="load"}
 
 
-h <- ggplot(full_df, aes(x=LSfact, y=tss_load, color=Treatment), inherit.aes = FALSE) +
+h <- ggplot(full_df, aes(x=log(ppt_sum), y=log(tss_load+0.0016488035), color=Treatment), inherit.aes = FALSE) +
   geom_point() + 
-  scale_y_log10() +
+  #scale_y_log10() +
   geom_smooth(method=lm, se=TRUE, fullrange=TRUE) +
   ggtitle("Log-log relationship between TSS load and rainfall accumulation \n(full dataset)") +
   theme(plot.title = element_text(size=14, face="bold",hjust = 0.5))
   
 h
 #ggsave("fig/randReg_ppt_load.png", h, width = 12, height = 12)
-
-g <- ggplot(full_df, aes(x=LSfact, y=log10(tss_load+0.0053), color=Treatment), inherit.aes = FALSE) +
-  geom_point() + 
-  geom_smooth(method=lm, se=TRUE, fullrange=TRUE) +
-  #scale_y_log10() +
-  ggtitle("Log-log relationship between TSS load and rainfall accumulation \n(full dataset)") +
-  theme(plot.title = element_text(size=14, face="bold",hjust = 0.5))
-  
-g
 
 ```
 
@@ -137,7 +127,7 @@ TSS_sum <- full_df %>%
 
 ```{r wp_plot, dependson = "plot_data", eval = FALSE, echo = FALSE}
 g <- ggplot(full_df, 
-           aes(x = ln_ppt, y = ln_tss_load, group=Treatment, color=Treatment)) + 
+           aes(x = log(ppt_sum), y = log(tss_load+0.0016488035), group=Treatment, color=Treatment)) + 
   geom_line() +
   geom_point() +
   facet_grid(SiteID + random ~ Year) + 
@@ -149,18 +139,6 @@ g
 #ggsave("fig/wp_plot.png", g)
 ```
 
-```{r wp_plot, dependson = "plot_data", eval = FALSE, echo = FALSE}
-g <- ggplot(effects %>% filter(grpvar=='SiteID:Year:sample_event'), 
-           aes(x = sample_event, y = condval)) + 
-  #geom_line() +
-  geom_point() +
-  facet_grid(SiteID ~ Year) + 
-  #scale_y_log10() + 
-  labs(title ="Total load (log(kg/ha)) by sample event") +
-  theme(axis.text.x = element_text(angle = 45, hjust = 1))
-g
-
-```
 
 
 ```{r wp_per_day_plot, dependson = "plot_data"}
@@ -214,7 +192,7 @@ There are three main analyses of interest:
 ### Treatment effect
 
 ```{r design_model, dependson = "load"}
-m_flume <- lmerTest::lmer(log(tss_load+0.00053) ~ 
+m_flume <- lmerTest::lmer(log(tss_load+0.0016488035) ~ 
                              Treatment*ln_ppt +
                             
                             Year*Treatment +
@@ -391,6 +369,20 @@ dotplot(rr1, scales=list(x=list(relation='free')))[['SiteID:Year:sample_event']]
 ggCaterpillar(ranef(m_flume,condVar=TRUE), QQ=TRUE, likeDotplot= TRUE, reorder=TRUE)[['SiteID:Year:sample_event']]
 
 qqmath(rr1)
+
+```
+
+
+```{r wp_plot, dependson = "plot_data", eval = FALSE, echo = FALSE}
+g <- ggplot(effects %>% filter(grpvar=='SiteID:Year:sample_event'), 
+           aes(x = sample_event, y = condval)) + 
+  #geom_line() +
+  geom_point() +
+  facet_grid(SiteID ~ Year) + 
+  #scale_y_log10() + 
+  labs(title ="Total load (log(kg/ha)) by sample event") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+g
 
 ```
 
