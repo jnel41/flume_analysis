@@ -106,7 +106,6 @@ rf_newtimes <- rf_times %>%
   do(add_dates(.)) %>%
   ungroup()
 
-
 rf_joined <- rf_newtimes %>% 
   left_join(load, by = c("SiteID", "date_time")) %>%
   group_by(SiteID, Treatment, Year.x, eventid, precipitation, rain_time) %>% 
@@ -119,6 +118,7 @@ rf_joined <- rf_newtimes %>%
 rf_cumulative <- rf_joined %>%
   group_by(Year, SiteID, rf_event, rain_time, sampleID) %>% 
   summarize(rain = sum(precipitation)) %>%
+  ungroup() %>%
   distinct(Year, SiteID, rain_time, sampleID, rain)
 
 write.csv(rf_cumulative, "./data/tidy/rfSed2_event12.csv",  row.names = FALSE)

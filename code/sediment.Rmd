@@ -13,8 +13,12 @@ library("tidyverse")
 
 flume <- read_csv("../data/tidy/flume_event_data612_UPDATE.csv") %>%
   mutate(Year = factor(Year)) %>%
-  subset(SiteID != "MCN")%>%
   subset(SiteID != 'MAR') %>%
+  subset(subset=!(SiteID=="MCN" & Year == 2016)) %>%
+  subset(subset=!(SiteID=="MCN" & Year == 2017)) %>%
+  subset(subset=!(SiteID=="MCN" & Year == 2018)) %>%
+  subset(subset=!(SiteID=="MCN" & Year == 2019)) %>%
+  subset(subset=!(SiteID=="MCN" & Year == 2020)) %>%
   subset(subset=!(SiteID=="RHO" & Year == 2016)) %>%
   subset(subset=!(SiteID=="RHO" & Year == 2017)) %>%
   subset(subset=!(SiteID == "WOR" & Year == 2018 & precipitation == "NA"))
@@ -23,14 +27,14 @@ flume <- read_csv("../data/tidy/flume_event_data612_UPDATE.csv") %>%
 
 ```{r total, dependson="create_sediment"}
 flume_sum <- flume %>%
-  group_by(Treatment, Year, SiteID, sample_event, tss_sum, crop) %>%
+  group_by(Treatment, Year, SiteID, sample_event, tss_sum, crop, slope75, Lsfactor) %>%
   summarize(tss_load = tss_sum) %>%
   distinct() 
 
 
 ppt_sum <- flume %>%
-  #group_by(Treatment, Year, SiteID, sample_event, crop,LSfact, slope_75) %>%
-  group_by(Treatment, Year, SiteID, sample_event, crop) %>%
+  group_by(Treatment, Year, SiteID, sample_event, crop, Lsfactor, slope75) %>%
+  #group_by(Treatment, Year, SiteID, sample_event, crop) %>%
   summarize(ppt_sum = sum(precipitation)) %>%
   ungroup() %>%
   filter(!duplicated(cbind(Year, SiteID, sample_event)))
@@ -39,16 +43,16 @@ ppt_sum <- flume %>%
 
 
 ```{r pivot tables, dependson = "total"}
-sample_anova <- flume_sum %>%
+sampl_anova <- flume_sum %>%
   filter(!is.na(tss_sum)) %>%
-  select(Year, SiteID, Treatment, sample_event, tss_sum, crop) %>%
+  select(Year, SiteID, Treatment, sample_event, tss_sum, crop, slope75, Lsfactor) %>%
   group_by(SiteID, Year, Treatment, sample_event, crop) %>%
     summarize(tss_load = sum(tss_sum)) %>% 
   ungroup() %>%
-  select(Year, SiteID, Treatment, sample_event, tss_load, crop) %>%
+  select(Year, SiteID, Treatment, sample_event, tss_load, crop, slope75, Lsfactor) %>%
   pivot_wider(names_from = Treatment, values_from = tss_load)
 
-pivot_sample <- sample_anova %>%
+pivot_sample <- sampl_anova %>%
   inner_join(ppt_sum,by=c("SiteID", "Year", "sample_event", "crop")) %>%
   filter(!is.na(strips)) %>%
   mutate(ln_ppt = log(ppt_sum)) %>%
@@ -58,7 +62,7 @@ long_load <- pivot_sample %>%
   gather(Treatment, tss_load, control:strips) %>%
   arrange(Treatment, tss_load) %>%
   filter(!is.na(diff)) %>%
-  select(SiteID, Treatment, Year, sample_event, tss_load, ppt_sum, crop)
+  select(SiteID, Treatment, Year, sample_event, tss_load, ppt_sum, crop, slope75, Lsfactor)
 
 ```
 
@@ -94,6 +98,6 @@ full_df <- rf_ro_pivot %>%
 
 save(full_df, file = "full_df.RData")
 
-write.csv(full_df,"D:/ISU/ResearchProject/flume_analysis/data/tidy/full_df.csv", row.names = FALSE)
+#write.csv(full_df,"D:/ISU/ResearchProject/flume_analysis/data/tidy/full_df.csv", row.names = FALSE)
 
 ```
