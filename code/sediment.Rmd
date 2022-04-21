@@ -43,16 +43,16 @@ ppt_sum <- flume %>%
 
 
 ```{r pivot tables, dependson = "total"}
-sampl_anova <- flume_sum %>%
+sample_anova <- flume_sum %>%
   filter(!is.na(tss_sum)) %>%
-  select(Year, SiteID, Treatment, sample_event, tss_sum, crop, slope75, Lsfactor) %>%
+  select(Year, SiteID, Treatment, sample_event, tss_sum, crop) %>%
   group_by(SiteID, Year, Treatment, sample_event, crop) %>%
     summarize(tss_load = sum(tss_sum)) %>% 
   ungroup() %>%
-  select(Year, SiteID, Treatment, sample_event, tss_load, crop, slope75, Lsfactor) %>%
+  select(Year, SiteID, Treatment, sample_event, tss_load, crop) %>%
   pivot_wider(names_from = Treatment, values_from = tss_load)
 
-pivot_sample <- sampl_anova %>%
+pivot_sample <- sample_anova %>%
   inner_join(ppt_sum,by=c("SiteID", "Year", "sample_event", "crop")) %>%
   filter(!is.na(strips)) %>%
   mutate(ln_ppt = log(ppt_sum)) %>%
