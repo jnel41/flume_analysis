@@ -29,13 +29,13 @@ flume <- read_csv("../data/tidy/flume_event_data612_UPDATE.csv") %>%
 
 ```{r total, dependson="create_sediment"}
 flume_sum <- flume %>%
-  group_by(Treatment, Year, SiteID, sample_event, tss_sum, crop, slope75, Lsfactor) %>%
+  group_by(Treatment, Year, SiteID, sample_event, tss_sum, crop, slope75, LSfactor, Lfactor,Sfactor) %>%
   summarize(tss_load = tss_sum) %>%
   distinct() 
 
 
 ppt_sum <- flume %>%
-  group_by(Treatment, Year, SiteID, sample_event, crop, Lsfactor, slope75) %>%
+  group_by(Treatment, Year, SiteID, sample_event, crop, slope75, LSfactor, Lfactor,Sfactor) %>%
   #group_by(Treatment, Year, SiteID, sample_event, crop) %>%
   summarize(ppt_sum = sum(precipitation)) %>%
   ungroup() %>%
