@@ -27,7 +27,7 @@ library("stringr")
 library("ggplot2")
 
 
-options(width = 120)
+options(width = 120, scipen = 999)
 
 dir.create("fig", showWarnings = FALSE)
 ```
@@ -36,14 +36,9 @@ dir.create("fig", showWarnings = FALSE)
 sessionInfo()
 ```
 
-## Read in data
-
-```{r, child="sediment.Rmd"}
-```
-
 
 ```{r load, dependson= "full_dataframe"}
-load("full_df.RData")
+load("E:/ISU/Project/SoilMove/data/statistics/flume_analysis/code/full_df.RData")
 
 ```
 
@@ -60,32 +55,6 @@ ggplot(site_year_rfevent, aes(Year, SiteID, fill=sample_event)) +
   geom_tile()
 ```
 
-## Data visualization
-
-## Number of samples
-
-Calculate the number of observations for each treatment-position-year-site-time
-combination. 
-
-```{r sample_event_counts, dependson="load"}
-TSS_counts <- full_df %>%
-  group_by(Year, SiteID, Treatment, crop, random) %>%
-  distinct() %>%
-  summarize(n = n(), .groups = "drop")
-```
-
-Plot the number of observations for each combination. 
-
-```{r plot_count, dependson="sample_event_counts", out.width = "\\textwidth"}
-g = ggplot(TSS_counts, aes(x = Treatment, y = crop, fill = n)) +
-  geom_tile() +
-  geom_text(aes(label = n), color = "white") +
-  facet_grid(SiteID + random ~ Year) +
-  scale_fill_gradient(low = "blue", high = "black") +
-  theme(axis.text.x = element_text(angle = 45, hjust = 1))
-
-g 
-```
 
 ```{r, dependson="load"}
 
@@ -93,7 +62,7 @@ g
 h <- ggplot(full_df, aes(x=log(ppt_sum), y=log(tss_load+0.0016488035), color=Treatment), inherit.aes = FALSE) +
   scale_color_manual(values = c("control" = "#176D9C",
                                "strips" = "#C38820")) +
-  geom_point(aes(shape=SiteID), size=4) + 
+  geom_point(size=4) + 
   #scale_y_log10() +
   xlab("log(rainfall total)") +
   ylab("log(TSS Load (kg/ha))") +
@@ -218,21 +187,6 @@ summary(m_flume)
 
 ```
 
-```{r design_step_model, dependson = "design_model"}
-m_flume_step <- step(m_flume, reduce.random = FALSE, alpha.fixed = 0.1)
-m_flume_model <- get_model(m_flume_step)
-summary(m_flume_model)
-
-##https://campus.datacamp.com/courses/hierarchical-and-mixed-effects-models-in-r/linear-mixed-effect-models?ex=7
-```
-
-#```{r design_step_model, dependson = "design_model"}
-#emmip(m_flume, ln_ppt ~ Treatment | Year)
-
-##https://campus.datacamp.com/courses/hierarchical-and-mixed-effects-models-in-r/linear-mixed-effect-models?ex=7
-#```
-
-
 ```{r design_model_contrasts, dependson = "design_model"}
 trt_yr = emmeans(m_flume, pairwise ~ Treatment|Year, 
                     type = "response",
@@ -308,15 +262,6 @@ resid_panel(m_flume,
             smoother = TRUE, qqbands = TRUE)
 
 resid_xpanel(m_flume)
-```
-
-### Selected model design
-```{r design_step_residual_plots, dependson = "design_step_model"}
-resid_panel(m_flume_model, 
-            plots = c("resid","index","yvp","qq"),
-            smoother = TRUE, qqbands = TRUE)
-
-resid_xpanel(m_flume_model)
 ```
 
 ```{r caterpillar, eval = FALSE, echo = FALSE}

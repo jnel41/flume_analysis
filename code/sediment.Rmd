@@ -11,6 +11,8 @@ output:
 
 library("tidyverse")
 
+options(scipen = 999)
+
 flume <- read_csv("../data/tidy/flume_event_data612_UPDATE.csv") %>%
   mutate(Year = factor(Year)) %>%
   subset(SiteID != 'MAR') %>%
@@ -45,11 +47,11 @@ ppt_sum <- flume %>%
 ```{r pivot tables, dependson = "total"}
 sampl_anova <- flume_sum %>%
   filter(!is.na(tss_sum)) %>%
-  select(Year, SiteID, Treatment, sample_event, tss_sum, crop, slope75, Lsfactor) %>%
+  select(Year, SiteID, Treatment, sample_event, tss_sum, crop) %>%
   group_by(SiteID, Year, Treatment, sample_event, crop) %>%
     summarize(tss_load = sum(tss_sum)) %>% 
   ungroup() %>%
-  select(Year, SiteID, Treatment, sample_event, tss_load, crop, slope75, Lsfactor) %>%
+  select(Year, SiteID, Treatment, sample_event, tss_load, crop) %>%
   pivot_wider(names_from = Treatment, values_from = tss_load)
 
 pivot_sample <- sampl_anova %>%
@@ -62,7 +64,7 @@ long_load <- pivot_sample %>%
   gather(Treatment, tss_load, control:strips) %>%
   arrange(Treatment, tss_load) %>%
   filter(!is.na(diff)) %>%
-  select(SiteID, Treatment, Year, sample_event, tss_load, ppt_sum, crop, slope75, Lsfactor)
+  select(SiteID, Treatment, Year, sample_event, tss_load, ppt_sum, crop)
 
 ```
 
