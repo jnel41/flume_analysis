@@ -23,6 +23,7 @@ library("emmeans")
 library("ggResidpanel")
 library("data.table")
 library("stringr")
+library("ggpmisc")
 
 options(width = 120, scipen = 999)
 
@@ -120,8 +121,9 @@ There are three main analyses of interest:
 
 
 ```{r designR_model, dependson = "flume_random"}
-mR_flume <- lmerTest::lmer(log(tss_load+0.0016488035) ~ 
+mR_flume <- lmerTest::lmer(log(tss_load+0.0016) ~ 
                              Treatment*ln_ppt +
+                            Treatment*crop +
                             Year*Treatment +
                             
                             (1 | SiteID) + 
@@ -176,25 +178,30 @@ confint(trt_pptR)$contrasts ## exp. the values
 ```
 
 ```{r, dependson="load"}
+h <- ggplot(flumeR, aes(x=log(ppt_sum), y=log(tss_load+0.0016), color=Treatment), inherit.aes = FALSE) +
+ scale_color_manual(values = c("control" = "#176D9C",
+                              "strips" = "#C38820")) +
+ geom_point(size=4) +
+ xlab("log(rainfall (mm))") +
+ ylab("log(TSS Load (kg/ha))") +
+ geom_smooth(method=lm, se=FALSE, fullrange=TRUE) +
+ ggtitle("Log-log relationship between TSS load and rainfall \n(random dataset)") +
+ theme(plot.title = element_text(size=14, face="bold",hjust = 0.5),
+       legend.key.size = unit(3,"line")) +
+ theme(plot.title = element_text(size=20, face="bold", hjust=0.5),
+       axis.title.x = element_text(size=18, face="bold"),
+       axis.title.y = element_text(size=18, face="bold"),
+       axis.text.x = element_text(size=18),
+       axis.text.y = element_text(size=18)) +
+ #xlim(-5, -1.5) +
+ stat_poly_eq(formula = y ~ x,
+              aes(label = paste(..eq.label.., ..rr.label.., ..p.value.label.., sep = "*`,`~")),
+              parse = TRUE,
+              label.x.npc = "left",
+              label.y.npc = "top",
+              vstep = 0.05) #+
+ #scale_y_log10()
 
-
-h <- ggplot(flumeR, aes(x=log(ppt_sum), y=log(tss_load+0.0016488035), color=Treatment), inherit.aes = FALSE) +
-  scale_color_manual(values = c("control" = "#176D9C",
-                               "strips" = "#C38820")) +
-  geom_point(aes(shape=SiteID), size=4) + 
-  #scale_y_log10() +
-  xlab("log(Rainfall Total)") +
-  ylab("log(TSS Load (kg/ha))") +
-  geom_smooth(method=lm, se=TRUE, fullrange=TRUE) +
-  ggtitle("Log-log relationship between TSS load and rainfall accumulation \n(Randomized Dataset)") +
-  theme(plot.title = element_text(size=14, face="bold",hjust = 0.5),
-        legend.key.size = unit(3,"line")) +
-  theme(plot.title = element_text(size=20, face="bold", hjust=0.5),
-        axis.title.x = element_text(size=18, face="bold"),
-        axis.title.y = element_text(size=18, face="bold"),
-        axis.text.x = element_text(size=18),
-        axis.text.y = element_text(size=18))
-  
 h
 #ggsave("fig/randReg_ppt_load.png", h, width = 12, height = 12)
 
@@ -225,34 +232,37 @@ resid_panel(mR_flume_model,
 resid_xpanel(mR_flume_model)
 ```
 
-```{r designR_model_figure, dependson="design_model_contrasts"}
-trtR <- as.data.frame(trtR)
+```{r designR_model_figure, dependson="load"}
+groupR <- flumeR %>% 
+  group_by(Treatment) %>% 
+  summarize(n = n(), 
+            mean = mean(tss_load), 
+            sd = sd(tss_load),
+            .groups = "drop") %>%
+  mutate(se = sd / sqrt(n),
+         lb = mean + qt(0.025, df = n-1)*se,
+         ub = mean - qt(0.025, df = n-1)*se)
 
-jR <- trtR %>%
-  filter(Treatment != ".")
-
-trtR_plot <- jR %>%
-  ggplot(aes(x=Treatment, y=response, fill=Treatment))+
+trt_plotR <- groupR %>%
+  ggplot(aes(x=Treatment, y=mean, fill=Treatment))+
   geom_bar(width = 0.5, position = position_dodge(), stat="summary") +
-  geom_errorbar(aes(ymin = (response-SE), ymax = (response+SE)),
-            width = 0.2,
-            linetype = "solid",
-            position = position_dodge(width = 0.5),
-            color="black", size=0.7) +
-  scale_fill_manual(values=c('#C38820','#176D9C')) +
-  #ggtitle("Comparison of mean TSS load measured by flume \n across sampling events (2016-2020)") +
-  ggtitle("Comparison of mean TSS load measured by flume \n (Randomized Dataset)") +
-  xlab("Treatment") + 
-  ylab("TSS Load (kg/ha)") +
-  theme(plot.title = element_text(size=20, face="bold", hjust=0.5),
-        axis.title.x = element_text(size=18, face="bold"),
-        axis.title.y = element_text(size=18, face="bold"),
-        axis.text.x = element_text(size=18),
-        axis.text.y = element_text(size=18)) +
-  scale_x_discrete(labels= c("Control", "Prairie Strips"))
-  #geom_text(aes(label=round(Score,2)), position=position_dodge(width=0.5),  vjust=-0.25) + 
-  #geom_text(aes(y = lb, label = lb), position=position_dodge(width=0.5), vjust=2)
+  geom_errorbar(aes(ymin = (mean-se), ymax = (mean+se)),
+                width = 0.2,
+                linetype = "solid",
+                position = position_dodge(width = 0.5),
+                color="black", size=0.7) +
+  scale_fill_manual(values = c("strips" = "#C38820", "control" = "#176D9C")) +
+  ggtitle("Comparison of Total Suspended Sediment (TSS) loads \n (Full Dataset)") +
+  xlab("Treatment") +
+  ylab("TSS Load \n(kg/ha)") +
+  theme(plot.title = element_text(size=12, face="bold", hjust=0.5),
+        axis.title.x = element_text(size=10, face="bold"),
+        axis.title.y = element_text(size=10, face="bold"),
+        axis.text.x = element_text(size=10),
+        axis.text.y = element_text(size=10)) +
+  scale_x_discrete(labels= c("Prairie Strip", "Control"))
 
-trtR_plot
+trt_plotR
+#ggsave("E:/ISU/Project/SoilMove/data/statistics/flume_analysis/code/fig/flume_plot.png", trt_plot)
 
 ```
