@@ -16,16 +16,15 @@ knitr::opts_chunk$set(echo = TRUE,
                       fig.width = 12,
                       fig.height = 12)
 
-library("lme4")
-library("lmerTest")
 library("tidyverse"); theme_set(theme_bw())
-library("lattice")
-library("emmeans")
-library("ggResidpanel")
-library("data.table")
-library("stringr")
-library("ggplot2")
-
+library(tidyverse) #for all data wrangling
+library(cowplot) #for manuscript ready figures
+library(lme4) #for lmer & glmer models
+library(sjPlot) #for plotting lmer and glmer mods
+library(sjmisc) 
+library(effects)
+library(sjstats)
+install.packages('cowplot')
 
 options(width = 120, scipen = 999)
 
@@ -39,6 +38,12 @@ sessionInfo()
 
 ```{r load, dependson= "full_dataframe"}
 load("E:/ISU/Project/SoilMove/data/statistics/flume_analysis/code/full_df.RData")
+
+rain_event <- read.csv('E:/ISU/Project/SoilMove/data/statistics/flume_analysis/data/tidy/rain_event12.csv', header=TRUE)
+
+rain_event <- rain_event %>% filter(!duplicated(cbind(Year, SiteID, eventStart)))
+
+runoff_event <- read.csv('E:/ISU/Project/SoilMove/data/statistics/flume_analysis/data/tidy/runoff_event12.csv', header=TRUE)
 
 ```
 
@@ -55,52 +60,23 @@ ggplot(site_year_rfevent, aes(Year, SiteID, fill=sample_event)) +
   geom_tile()
 ```
 
-
-```{r, dependson="load"}
-
-
-h <- ggplot(full_df, aes(x=log(ppt_sum), y=log(tss_load+0.0016488035), color=Treatment), inherit.aes = FALSE) +
-  scale_color_manual(values = c("control" = "#176D9C",
-                               "strips" = "#C38820")) +
-  geom_point(size=4) + 
-  #scale_y_log10() +
-  xlab("log(rainfall total)") +
-  ylab("log(TSS Load (kg/ha))") +
-  geom_smooth(method=lm, se=TRUE, fullrange=TRUE) +
-  ggtitle("Log-log relationship between TSS load and rainfall accumulation \n(full dataset)") +
-  theme(plot.title = element_text(size=14, face="bold",hjust = 0.5),
-        legend.key.size = unit(3,"line")) +
-  theme(plot.title = element_text(size=20, face="bold", hjust=0.5),
-        axis.title.x = element_text(size=18, face="bold"),
-        axis.title.y = element_text(size=18, face="bold"),
-        axis.text.x = element_text(size=18),
-        axis.text.y = element_text(size=18))
-  
-h
-#ggsave("fig/randReg_ppt_load.png", h, width = 12, height = 12)
-
-```
-
 ```{r mean_data, dependson = "load"}
-load_sum <- full_df %>%
-  group_by(Year, SiteID, Treatment, crop) %>%
-  summarize(sum_load             = sum(tss_load, na.rm = TRUE),
-            log_load = mean(log(sum_load), na.rm = TRUE),
-            n                   = n(),
-            .groups = "drop")
-
-
-ppt_sum <- full_df %>%
+ppt_sum <- rain_event %>%
+  filter(!duplicated(cbind(Year, SiteID, eventStart))) %>%
   group_by(Year, SiteID) %>%
-  summarize(sum_ppt             = sum(ppt_sum, na.rm = TRUE)*1000,
-            #log_load = mean(log(sum_load), na.rm = TRUE),
-            n                   = n(),
+  summarize(sum_pptmm = sum(precipitation, na.rm = TRUE)*1000,
+            time_min = sum(rain_time),
+            n = n(),
             .groups = "drop")
 
-TSS_sum <- full_df %>%
+runoff_sum <- runoff_event %>%
+  filter(!duplicated(cbind(Year, SiteID, eventStart))) %>%
   group_by(Year, SiteID, Treatment) %>%
   distinct() %>%
-  summarize(tss_sum = sum(tss_load), .groups = "drop")
+  summarize(sum_flow = sum(flow),
+            time_min = sum(flow_time),
+            n = n(),
+            .groups = "drop")
 
 ```
 

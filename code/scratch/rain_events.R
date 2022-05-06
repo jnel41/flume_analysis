@@ -36,6 +36,7 @@ rf_events <- f %>%
   gather(Treatment, rain, control:strips) %>%                   #changing data back into long form
   arrange(Treatment, date) %>%                              #sorting
   filter(rain != "NA") %>%
+  filter(!duplicated(cbind(Year, SiteID, eventStart))) %>%
   select(date, SiteID, Treatment, Year, rain, event)
 
 write.csv(rain,"./data/tidy/rain.csv", row.names = FALSE)

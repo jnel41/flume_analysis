@@ -26,9 +26,12 @@ library("data.table")
 library("stringr")
 library("ggplot2")
 library("ggpmisc")
+library("performance")
+library("multcomp")
 
 
 options(width = 120)
+windowsFonts(A = windowsFont("Times New Roman")) 
 
 dir.create("fig", showWarnings = FALSE)
 ```
@@ -117,32 +120,33 @@ g
 
 ```{r, dependson="load"}
 h <- ggplot(full_df, aes(x=log(ppt_sum), y=log(tss_load+0.0016), color=Treatment), inherit.aes = FALSE) +
- scale_color_manual(values = c("control" = "#176D9C",
-                              "strips" = "#C38820")) +
+ scale_color_manual(values = c("control" = "#C38820",
+                              "strips" = "#176D9C"),
+                    labels=c("Control", "Prairie Strip"),
+                    name  ="") +
  geom_point(size=4) +
- xlab("log(rainfall (mm))") +
- ylab("log(TSS Load (kg/ha))") +
+ xlab("log(Rainfall accumulation (mm))") +
+ ylab("log(TSS load (kg/ha))") +
  geom_smooth(method=lm, se=FALSE, fullrange=TRUE) +
- ggtitle("Log-log relationship between TSS load and rainfall \n(full dataset)") +
- theme(plot.title = element_text(size=14, face="bold",hjust = 0.5),
+ ggtitle("A. Full Dataset") +
+ theme(plot.title = element_text(family="A", size=22, face="bold", hjust=0.5),
+       axis.title.x = element_text(family="A", size=22, face="bold"),
+       axis.title.y = element_text(family="A", size=22, face="bold"),
+       axis.text.x = element_text(family="A", size=22),
+       axis.text.y = element_text(family="A", size=22),
+       legend.text = element_text(family = "A", size=22),
        legend.key.size = unit(3,"line")) +
- theme(plot.title = element_text(size=20, face="bold", hjust=0.5),
-       axis.title.x = element_text(size=18, face="bold"),
-       axis.title.y = element_text(size=18, face="bold"),
-       axis.text.x = element_text(size=18),
-       axis.text.y = element_text(size=18)) +
- #xlim(-5, -1.5) +
  stat_poly_eq(formula = y ~ x,
               aes(label = paste(..eq.label.., ..rr.label.., ..p.value.label.., sep = "*`,`~")),
               parse = TRUE,
               label.x.npc = "left",
-              label.y.npc = "bottom",
-              vstep = 0.05) #+
- #scale_y_log10()
+              label.y.npc = "top",
+              vstep = 0.05,
+              size = 6)
 
 h
 
-# ggsave("fig/randReg_sfactorbase10.png", h, width = 12, height = 12)
+ggsave("E:/ISU/Project/SoilMove/data/statistics/flume_analysis/code/fig/Reg_ppt_load.png", h, width = 12, height = 12)
 
 ```
 
@@ -156,7 +160,7 @@ load_sum <- full_df %>%
 
 
 ppt_sum <- full_df %>%
-  group_by(Year, SiteID) %>%
+  group_by(Year, SiteID, Treatment) %>%
   summarize(sum_ppt             = sum(ppt_sum, na.rm = TRUE)*1000,
             #log_load = mean(log(sum_load), na.rm = TRUE),
             n                   = n(),
@@ -249,6 +253,27 @@ m_flume <- lmerTest::lmer(log(tss_load+0.0016488035) ~
                           data = full_df)
 
 summary(m_flume)
+confint(m_flume, oldNames = FALSE)
+anova(m_flume)
+r2_nakagawa(m_flume)
+icc(m_flume)
+
+full_df$trt_lnppt <- interaction(full_df$Treatment, full_df$ln_ppt)
+m2_flume <- lmerTest::lmer(log(tss_load+0.0016488035) ~ 
+                             trt_lnppt +
+                            Treatment*crop +
+                            Year*Treatment +
+                            
+                            #(1 | SiteID) + #removed due to singular fit
+                             (1 | SiteID:Treatment) + 
+                            (1|Year:sample_event) + #consider this and below with SiteID 
+                            (1|SiteID:Year:sample_event), 
+                          
+                          data = full_df)
+
+summary(m2_flume)
+contr <- glht(m2_flume, linfct=mcp(trt_lnppt='Tukey'))
+summary(contr, test=adjusted("Shaffer"))
 
 ```
 
@@ -283,22 +308,38 @@ year = emmeans(m_flume, ~ Year,
                     lmer.df = "asymptotic") 
 confint(year)
 
+##make this a function of what it is equal to (ln_ppt), could automate, but doing manual, ##uniroot()
 trt_ppt = emmeans(m_flume, pairwise ~ Treatment|ln_ppt,
-                    #at=list(ln_ppt=c(-4,-3.1,-3,-2)), 
+                    at=list(ln_ppt=c(-2.815)), 
                     type = "response",
-                    lmer.df = "asymptotic", adjust='scheffe')
+                    lmer.df = "asymptotic")
 
+contrast(trt_ppt, "pairwise")
 confint(trt_ppt)$contrasts ## exp. the values
 
-plot(pairs(emmeans(m_flume, 'Treatment', 'crop'), adjust="scheffe")) + 
-  theme_bw(base_size=18) + 
-  geom_vline(xintercept=0, size=2, color="red")
+trt_ppt2 = emmeans(m_flume, "Treatment",
+                   by='ln_ppt',
+                    at=list(ln_ppt=c(-2.815, -3, -2.45, -3.62)), 
+                    type = "response",
+                    lmer.df = "asymptotic")
+con = contrast(trt_ppt2, "pairwise", options= list(adjust = 'bonferroni'))
+summary(con)
+con
+#emtrends(m_flume, pairwise~Treatment, var="ln_ppt")
+#emmip(m_flume, Treatment~ln_ppt, cov.reduce = range)
+#testInteractions(m_flume, residual=c("Treatment", "crop"))
 
-#crop      = emmeans(m_flume, pairwise ~ Treatment|crop,   
-#                    type = "response",
-#                    lmer.df = "asymptotic")
 
-#confint(crop)$contrasts
+
+#plot(pairs(emmeans(m_flume, 'Treatment', 'crop'), adjust="jessica")) + 
+#  theme_bw(base_size=18) + 
+#  geom_vline(xintercept=0, size=2, color="red")
+
+crop      = emmeans(m_flume, pairwise ~ Treatment|crop,   
+                    type = "response",
+                    lmer.df = "asymptotic")
+
+confint(crop)$contrasts
 
 ```
 
@@ -330,8 +371,6 @@ plot(pairs(emmeans(m_flume, 'Treatment', 'crop'), adjust="scheffe")) +
 # 
 # trt_plot
 
-d <- full_df
-
 group <- full_df %>% 
   group_by(Treatment) %>% 
   summarize(n = n(), 
@@ -346,23 +385,25 @@ trt_plot <- group %>%
   ggplot(aes(x=Treatment, y=mean, fill=Treatment))+
   geom_bar(width = 0.5, position = position_dodge(), stat="summary") +
   geom_errorbar(aes(ymin = (mean-se), ymax = (mean+se)),
-                width = 0.2,
+                width = 0.3,
                 linetype = "solid",
                 position = position_dodge(width = 0.5),
                 color="black", size=0.7) +
-  scale_fill_manual(values = c("strips" = "#C38820", "control" = "#176D9C")) +
-  ggtitle("Comparison of Total Suspended Sediment (TSS) loads \n (Full Dataset)") +
+  scale_fill_manual(values = c("control" = "#C38820",
+                              "strips" = "#176D9C")) +
+  ggtitle("A. Full Dataset") +
   xlab("Treatment") +
-  ylab("TSS Load \n(kg/ha)") +
-  theme(plot.title = element_text(size=12, face="bold", hjust=0.5),
-        axis.title.x = element_text(size=10, face="bold"),
-        axis.title.y = element_text(size=10, face="bold"),
-        axis.text.x = element_text(size=10),
-        axis.text.y = element_text(size=10)) +
-  scale_x_discrete(labels= c("Prairie Strip", "Control"))
+  ylab("TSS Load (kg/ha)") +
+ theme(plot.title = element_text(family="A", size=18, face="bold", hjust=0.5),
+       axis.title.x = element_text(family="A", size=18, face="bold"),
+       axis.title.y = element_text(family="A", size=18, face="bold"),
+       axis.text.x = element_text(family="A", size=18),
+       axis.text.y = element_text(family="A", size=18)) +
+  scale_x_discrete(labels= c("Prairie Strip", "Control"))+
+  scale_y_continuous(limits = c(0, 50))
 
 trt_plot
-#ggsave("E:/ISU/Project/SoilMove/data/statistics/flume_analysis/code/fig/flume_plot.png", trt_plot)
+ggsave("E:/ISU/Project/SoilMove/data/statistics/flume_analysis/code/fig/flume_plot.png", trt_plot)
 ```
 
 # Check assumptions

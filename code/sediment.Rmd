@@ -100,6 +100,6 @@ full_df <- rf_ro_pivot %>%
 
 save(full_df, file = "full_df.RData")
 
-#write.csv(full_df,"D:/ISU/ResearchProject/flume_analysis/data/tidy/full_df.csv", row.names = FALSE)
+write.csv(full_df,"../data/tidy/full_df.csv", row.names = FALSE)
 
 ```
