@@ -29,13 +29,13 @@ flume <- read_csv("../data/tidy/flume_event_data612_UPDATE.csv") %>%
 
 ```{r total, dependson="create_sediment"}
 flume_sum <- flume %>%
-  group_by(Treatment, Year, SiteID, sample_event, tss_sum, crop, slope75, LSfactor, Lfactor,Sfactor) %>%
+  group_by(Treatment, Year, SiteID, sample_event, tss_sum, crop, slope75, LSfactor, Lfactor, Sfactor, C_factor, K_factor, post_Lupslp, post_Tupslp, pre_Lupslp) %>%
   summarize(tss_load = tss_sum) %>%
   distinct() 
 
 
 ppt_sum <- flume %>%
-  group_by(Treatment, Year, SiteID, sample_event, crop, slope75, LSfactor, Lfactor,Sfactor) %>%
+  group_by(Treatment, Year, SiteID, sample_event, crop, slope75, LSfactor, Lfactor, Sfactor, C_factor, K_factor, post_Lupslp, post_Tupslp, pre_Lupslp) %>%
   #group_by(Treatment, Year, SiteID, sample_event, crop) %>%
   summarize(ppt_sum = sum(precipitation)) %>%
   ungroup() %>%
@@ -47,11 +47,11 @@ ppt_sum <- flume %>%
 ```{r pivot tables, dependson = "total"}
 sampl_anova <- flume_sum %>%
   filter(!is.na(tss_sum)) %>%
-  select(Year, SiteID, Treatment, sample_event, tss_sum, crop) %>%
+  dplyr::select(Year, SiteID, Treatment, sample_event, tss_sum, crop) %>%
   group_by(SiteID, Year, Treatment, sample_event, crop) %>%
-    summarize(tss_load = sum(tss_sum)) %>% 
+  summarize(tss_load = sum(tss_sum)) %>% 
   ungroup() %>%
-  select(Year, SiteID, Treatment, sample_event, tss_load, crop) %>%
+  dplyr::select(Year, SiteID, Treatment, sample_event, tss_load, crop) %>%
   pivot_wider(names_from = Treatment, values_from = tss_load)
 
 pivot_sample <- sampl_anova %>%
@@ -64,9 +64,10 @@ long_load <- pivot_sample %>%
   gather(Treatment, tss_load, control:strips) %>%
   arrange(Treatment, tss_load) %>%
   filter(!is.na(diff)) %>%
-  select(SiteID, Treatment, Year, sample_event, tss_load, ppt_sum, crop)
+  dplyr::select(SiteID, Treatment, Year, sample_event, tss_load, ppt_sum, crop)
 
 ```
+
 
 ```{r random coding, dependson = "pivot tables"}
 rf_ro_pivot <- long_load %>%
@@ -94,7 +95,13 @@ full_df <- rf_ro_pivot %>%
   drop_na(tss_load) %>%
   mutate(ppt_sum = ppt_sum.x,
          ln_ppt = log(ppt_sum.x),
-         Treatment = factor(Treatment.x, levels=c('strips','control'))) %>%
+         Treatment = factor(Treatment.x, levels=c('strips','control')),
+         ln_slp = log(slope75),
+         ln_LS = log(LSfactor),
+         ln_L = log(Lfactor),
+         ln_S = log(Sfactor),
+         ln_postL = log(post_Lupslp),
+         ln_postT = log(post_Tupslp)) %>%
   subset(select = -c(Treatment.y, Treatment.x, ppt_sum.x, ppt_sum.y)) %>%
   arrange(Year, SiteID, Treatment, sample_event)
 

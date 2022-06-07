@@ -58,7 +58,7 @@ flumeR <- full_df %>%
 
 ```{r, dependson="flume_random"}
 site_year_rfeventR <- flumeR %>%
-  select(SiteID, Year, sample_event) %>%
+  dplyr::select(SiteID, Year, sample_event) %>%
   unique()
 
 ggplot(site_year_rfeventR, aes(Year, SiteID, fill=sample_event)) +
@@ -112,7 +112,7 @@ There are three main analyses of interest:
 ```{r designR_model, dependson = "flume_random"}
 mR_flume <- lmerTest::lmer(log(tss_load+0.0016) ~ 
                              Treatment*ln_ppt +
-                            Treatment*crop +
+                            #Treatment*crop +
                             Year*Treatment +
                              #Treatment*Lfactor +
                              #Treatment*LSfactor +
@@ -129,9 +129,9 @@ mR_flume <- lmerTest::lmer(log(tss_load+0.0016) ~
 
 summary(mR_flume)
 #confint(mR_flume, oldNames = FALSE)
-#anova(mR_flume)
-#r2_nakagawa(mR_flume)
-#icc(mR_flume)
+anova(mR_flume)
+r2_nakagawa(mR_flume)
+icc(mR_flume)
 
 ```
 
@@ -167,11 +167,11 @@ trt_pptR  = emmeans(mR_flume, pairwise ~ Treatment|ln_ppt,
 
 confint(trt_pptR)$contrasts ## exp. the values
 
-cropR      = emmeans(mR_flume, pairwise ~ Treatment|crop,   
-                    type = "response",
-                    lmer.df = "asymptotic")
+#cropR      = emmeans(mR_flume, pairwise ~ Treatment|crop,   
+#                    type = "response",
+#                    lmer.df = "asymptotic")
 
-confint(cropR)
+#confint(cropR)
 ```
 
 ```{r, dependson="load"}
@@ -180,17 +180,17 @@ h <- ggplot(flumeR, aes(x=log(ppt_sum), y=log(tss_load+0.0016), color=Treatment)
                               "strips" = "#176D9C"),
                     labels=c("Control", "Prairie Strip"),
                     name  ="") +
- geom_point(size=4) +
- xlab("log(Rainfall accumulation (mm))") +
- ylab("log(TSS load (kg/ha))") +
- geom_smooth(method=lm, se=FALSE, fullrange=TRUE) +
- ggtitle("B. Random Dataset") +
- theme(plot.title = element_text(family="A", size=22, face="bold", hjust=0.5),
-       axis.title.x = element_text(family="A", size=22, face="bold"),
-       axis.title.y = element_text(family="A", size=22, face="bold"),
-       axis.text.x = element_text(family="A", size=22),
-       axis.text.y = element_text(family="A", size=22),
-       legend.text = element_text(family = "A", size=22),
+ geom_point(size=5) +
+ xlab("log(Rainfall Total (mm))") +
+ ylab("log(TSS Load (kg/ha))") +
+ geom_smooth(method=lm, se=FALSE, fullrange=TRUE, size=3) +
+ ggtitle("B. Randomized Location Subset (Out)") +
+ theme(plot.title = element_text(family="A", size=28, face="bold", hjust=0.5),
+       axis.title.x = element_text(family="A", size=28, face="bold"),
+       axis.title.y = element_text(family="A", size=28, face="bold"),
+       axis.text.x = element_text(family="A", size=28),
+       axis.text.y = element_text(family="A", size=28),
+       legend.text = element_text(family = "A", size=28),
        legend.key.size = unit(3,"line")) +
  stat_poly_eq(formula = y ~ x,
               aes(label = paste(..eq.label.., ..rr.label.., ..p.value.label.., sep = "*`,`~")),
@@ -198,11 +198,10 @@ h <- ggplot(flumeR, aes(x=log(ppt_sum), y=log(tss_load+0.0016), color=Treatment)
               label.x.npc = "left",
               label.y.npc = "top",
               vstep = 0.05,
-              size = 6)
+              size = 8)
 
 h
-ggsave("E:/ISU/Project/SoilMove/data/statistics/flume_analysis/code/fig/randReg_ppt_load.png", h, width = 12, height = 12)
-
+ggsave("E:/ISU/Project/SoilMove/data/statistics/flume_analysis/code/fig/randReg_ppt_loadOUT.png", h, width = 12, height = 12)
 ```
 
 # Check assumptions
@@ -251,14 +250,14 @@ trt_plotR <- groupR %>%
                 color="black", size=0.7) +
   scale_fill_manual(values = c("control" = "#C38820",
                               "strips" = "#176D9C")) +
-  ggtitle("B. Random Dataset") +
+  ggtitle("B. Randomized Location Subset") +
   xlab("Treatment") +
-  ylab("TSS Load \n(kg/ha)") +
-  theme(plot.title = element_text(family = "A", size=18, face="bold", hjust=0.5),
-       axis.title.x = element_text(family = "A", size=18, face="bold"),
-       axis.title.y = element_text(family = "A", size=18, face="bold"),
-       axis.text.x = element_text(family = "A", size=18),
-       axis.text.y = element_text(family = "A", size=18)) +
+  ylab("TSS Load (kg/ha)") +
+  theme(plot.title = element_text(family = "A", size=28, face="bold", hjust=0.5),
+       axis.title.x = element_text(family = "A", size=28, face="bold"),
+       axis.title.y = element_text(family = "A", size=28, face="bold"),
+       axis.text.x = element_text(family = "A", size=28),
+       axis.text.y = element_text(family = "A", size=28)) +
   scale_x_discrete(labels= c("Prairie Strip", "Control")) +
   scale_y_continuous(limits = c(0, 50)) +
   theme(text = element_text())
@@ -266,4 +265,44 @@ trt_plotR <- groupR %>%
 trt_plotR
 ggsave("E:/ISU/Project/SoilMove/data/statistics/flume_analysis/code/fig/randflume_plot.png", trt_plotR)
 
+```
+
+
+```{r extract-contrast-ci, dependson="design_model"}
+extract_contrast_ci <- function(d) {
+  mR <- lmerTest::lmer(update(mR_flume, 
+                          as.formula(paste0("~.+",d$variable))),
+                    data = flumeR) 
+    
+  # Obtain coefficient for new variable
+  av <- anova(mR)
+  rowid <- which(rownames(av) == d$variable)
+  
+   
+  em <- emmeans(mR, 
+                pairwise ~ Treatment, 
+                type = "response", 
+                lmer.df = "asymptotic")
+  
+  cbind(
+    av[rowid,] %>% as.data.frame,
+    confint(em)$contrasts %>% as.data.frame
+  )
+}
+```
+
+
+```{r treatment-effect-with-explanatory-variables, dependson=c("extract-contrast-ci")}
+add <- data.frame(variable = c("slope75", "C_factor", "K_factor", "LSfactor", "Lfactor", "Sfactor", "post_Lupslp", "post_Tupslp", "ln_ppt", "pre_Lupslp"))
+
+added_variable_analysesR <- add %>% 
+  group_by(variable) %>%
+  do(extract_contrast_ci(.))
+```
+
+
+```{r print-added-variable-analysis, dependson="treatment-effect-with-explanatory-variables", results='asis'}
+added_variable_analysesR %>%
+  xtable() %>%
+  print(type="html", include.rownames=FALSE)
 ```

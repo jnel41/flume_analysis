@@ -28,9 +28,10 @@ library("ggplot2")
 library("ggpmisc")
 library("performance")
 library("multcomp")
+library("xtable")
 
 
-options(width = 120)
+options(width = 120, scipen = 999)
 windowsFonts(A = windowsFont("Times New Roman")) 
 
 dir.create("fig", showWarnings = FALSE)
@@ -47,8 +48,33 @@ sessionInfo()
 
 
 ```{r load, dependson= "full_dataframe"}
-load("full_df.RData")
+#load("full_df.RData")
+full_df <- read_csv("../data/tidy/full_df_out.csv") %>%
+  mutate(Year = factor(Year),
+         Treatment = factor(Treatment, levels=c('strips','control')))
+  
+#load_weight_time$ln_ppt <- log((load_weight_time$precipitation+0.0004)*100)
+#load_weight_time$Year <- factor(load_weight_time$Year)
 
+##Statistical significance between treatments
+rusle <- read_csv("../data/scratch/rusle_calculations.csv") %>%
+    filter(Scenario == "current") %>%
+  filter(random == "R")
+
+control <- rusle$control
+strips <- rusle$strips
+
+rusle_st <- rusle %>%
+  filter(Scenario == "current") %>%
+  group_by(Treatment) %>%
+  summarise(
+    count = n(),
+    mean = mean(A, na.rm = TRUE),
+    sd = sd(A, na.rm = TRUE)
+  )
+
+res <- t.test(control, strips, paired=TRUE)
+res
 ```
 
 ## Exploratory analysis
@@ -122,19 +148,20 @@ g
 h <- ggplot(full_df, aes(x=log(ppt_sum), y=log(tss_load+0.0016), color=Treatment), inherit.aes = FALSE) +
  scale_color_manual(values = c("control" = "#C38820",
                               "strips" = "#176D9C"),
-                    labels=c("Control", "Prairie Strip"),
+                  #labels=c( "Control", "Prairie Strip"),
                     name  ="") +
- geom_point(size=4) +
- xlab("log(Rainfall accumulation (mm))") +
+#h <- ggplot(full_df, aes(x=log(ppt_sum), y=log(tss_load+0.0016)), inherit.aes = FALSE) +
+ geom_point(size=5) +
+ xlab("log(Rainfall Total (mm))") +
  ylab("log(TSS load (kg/ha))") +
- geom_smooth(method=lm, se=FALSE, fullrange=TRUE) +
- ggtitle("A. Full Dataset") +
- theme(plot.title = element_text(family="A", size=22, face="bold", hjust=0.5),
-       axis.title.x = element_text(family="A", size=22, face="bold"),
-       axis.title.y = element_text(family="A", size=22, face="bold"),
-       axis.text.x = element_text(family="A", size=22),
-       axis.text.y = element_text(family="A", size=22),
-       legend.text = element_text(family = "A", size=22),
+ geom_smooth(method=lm, se=FALSE, fullrange=TRUE, size=3) +
+ ggtitle("A. Full Dataset (Out)") +
+ theme(plot.title = element_text(family="A", size=28, face="bold", hjust=0.5),
+       axis.title.x = element_text(family="A", size=28, face="bold"),
+       axis.title.y = element_text(family="A", size=28, face="bold"),
+       axis.text.x = element_text(family="A", size=28),
+       axis.text.y = element_text(family="A", size=28),
+       legend.text = element_text(family = "A", size=28),
        legend.key.size = unit(3,"line")) +
  stat_poly_eq(formula = y ~ x,
               aes(label = paste(..eq.label.., ..rr.label.., ..p.value.label.., sep = "*`,`~")),
@@ -142,11 +169,11 @@ h <- ggplot(full_df, aes(x=log(ppt_sum), y=log(tss_load+0.0016), color=Treatment
               label.x.npc = "left",
               label.y.npc = "top",
               vstep = 0.05,
-              size = 6)
+              size = 8)
 
 h
 
-ggsave("E:/ISU/Project/SoilMove/data/statistics/flume_analysis/code/fig/Reg_ppt_load.png", h, width = 12, height = 12)
+ggsave("E:/ISU/Project/SoilMove/data/statistics/flume_analysis/code/fig/Reg_ppt_loadOUT.png", h, width = 12, height = 12)
 
 ```
 
@@ -240,40 +267,45 @@ There are three main analyses of interest:
 ### Treatment effect
 
 ```{r design_model, dependson = "load"}
-m_flume <- lmerTest::lmer(log(tss_load+0.0016488035) ~ 
-                             Treatment*ln_ppt +
-                            Treatment*crop +
+#m_flume <- lmerTest::lmer(log(tss_load+0.0016) ~ 
+#                             Treatment*ln_ppt +
+#                            #Treatment*crop +
+#                            Year*Treatment +
+                            
+                            #(1 | SiteID) + #removed due to singular fit
+#                             (1 | SiteID:Treatment) + 
+#                            (1|Year:sample_event) + #consider this and below with SiteID 
+#                            (1|SiteID:Year:sample_event), 
+#                          
+#                          data = full_df)
+
+#summary(m_flume)
+#confint(m_flume, oldNames = FALSE)
+#anova(m_flume)
+#r2_nakagawa(m_flume)
+#icc(m_flume)
+
+#full_df$trt_lnppt <- interaction(full_df$Treatment, full_df$ln_ppt)
+loadR <- load_weight_time %>%
+  #filter(!is.na(ro_event)) %>%
+    subset(random == 'R')
+m2_flume <- lmerTest::lmer(log(tss_sum+0.0016) ~ 
+                            Treatment*ln_ppt +
                             Year*Treatment +
                             
                             #(1 | SiteID) + #removed due to singular fit
-                             (1 | SiteID:Treatment) + 
-                            (1|Year:sample_event) + #consider this and below with SiteID 
-                            (1|SiteID:Year:sample_event), 
+                             #(1 | SiteID:Treatment) + 
+                            #(1|Year:Time) + #consider this and below with SiteID 
+                            (1|SiteID:Year:Time), 
                           
-                          data = full_df)
-
-summary(m_flume)
-confint(m_flume, oldNames = FALSE)
-anova(m_flume)
-r2_nakagawa(m_flume)
-icc(m_flume)
-
-full_df$trt_lnppt <- interaction(full_df$Treatment, full_df$ln_ppt)
-m2_flume <- lmerTest::lmer(log(tss_load+0.0016488035) ~ 
-                             trt_lnppt +
-                            Treatment*crop +
-                            Year*Treatment +
-                            
-                            #(1 | SiteID) + #removed due to singular fit
-                             (1 | SiteID:Treatment) + 
-                            (1|Year:sample_event) + #consider this and below with SiteID 
-                            (1|SiteID:Year:sample_event), 
-                          
-                          data = full_df)
+                          data = loadR)
 
 summary(m2_flume)
-contr <- glht(m2_flume, linfct=mcp(trt_lnppt='Tukey'))
-summary(contr, test=adjusted("Shaffer"))
+anova(m2_flume)
+r2(m2_flume)
+icc(m2_flume)
+#contr <- glht(m2_flume, linfct=mcp(trt_lnppt='Tukey'))
+#summary(contr, test=adjusted("Shaffer"))
 
 ```
 
@@ -394,11 +426,11 @@ trt_plot <- group %>%
   ggtitle("A. Full Dataset") +
   xlab("Treatment") +
   ylab("TSS Load (kg/ha)") +
- theme(plot.title = element_text(family="A", size=18, face="bold", hjust=0.5),
-       axis.title.x = element_text(family="A", size=18, face="bold"),
-       axis.title.y = element_text(family="A", size=18, face="bold"),
-       axis.text.x = element_text(family="A", size=18),
-       axis.text.y = element_text(family="A", size=18)) +
+ theme(plot.title = element_text(family="A", size=28, face="bold", hjust=0.5),
+       axis.title.x = element_text(family="A", size=28, face="bold"),
+       axis.title.y = element_text(family="A", size=28, face="bold"),
+       axis.text.x = element_text(family="A", size=28),
+       axis.text.y = element_text(family="A", size=28)) +
   scale_x_discrete(labels= c("Prairie Strip", "Control"))+
   scale_y_continuous(limits = c(0, 50))
 
@@ -431,6 +463,49 @@ resid_panel(m_flume_model,
 
 resid_xpanel(m_flume_model)
 ```
+
+
+
+```{r extract-contrast-ci, dependson="design_model"}
+extract_contrast_ci <- function(d) {
+  m <- lmerTest::lmer(update(m_flume, 
+                          as.formula(paste0("~.+",d$variable))),
+                    data = full_df) 
+    
+  # Obtain coefficient for new variable
+  av <- anova(m)
+  rowid <- which(rownames(av) == d$variable)
+  
+   
+  em <- emmeans(m, 
+                pairwise ~ Treatment, 
+                type = "response", 
+                lmer.df = "asymptotic")
+  
+  cbind(
+    av[rowid,] %>% as.data.frame,
+    confint(em)$contrasts %>% as.data.frame
+  )
+}
+```
+
+
+```{r treatment-effect-with-explanatory-variables, dependson=c("extract-contrast-ci")}
+add <- data.frame(variable = c("slope75", "C_factor", "K_factor", "LSfactor", "Lfactor", "Sfactor", 
+               "post_Lupslp", "post_Tupslp", "ln_ppt", "pre_Lupslp"))
+
+added_variable_analyses <- add %>% 
+  group_by(variable) %>%
+  do(extract_contrast_ci(.))
+```
+
+
+```{r print-added-variable-analysis, dependson="treatment-effect-with-explanatory-variables", results='asis'}
+added_variable_analyses %>%
+  xtable() %>%
+  print(type="html", include.rownames=FALSE)
+```
+
 
 ```{r caterpillar, eval = FALSE, echo = FALSE}
 
