@@ -19,12 +19,17 @@ knitr::opts_chunk$set(echo = TRUE,
 library("lme4")
 library("lmerTest")
 library("tidyverse"); theme_set(theme_bw())
+library("lattice")
 library("emmeans")
 library("ggResidpanel")
 library("data.table")
 library("stringr")
+library("ggplot2")
 library("ggpmisc")
 library("performance")
+library("multcomp")
+library("xtable")
+
 
 options(width = 120, scipen = 999)
 windowsFonts(A = windowsFont("Times New Roman")) 
