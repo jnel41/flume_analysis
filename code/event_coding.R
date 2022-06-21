@@ -6,8 +6,8 @@ library("lubridate")
 options(scipen=999999)
 
 add_dates <- function(d) {
-  data.frame(date_time = seq(as.POSIXct(d$eventStart, format='%m/%d/%Y %H:%M'),
-                             as.POSIXct(d$eventEnd,   format='%m/%d/%Y %H:%M'),
+  data.frame(date_time = seq(as.POSIXct(d$eventStart, format='%m-%d-%Y %H:%M'),
+                             as.POSIXct(d$eventEnd,   format='%m-%d-%Y %H:%M'),
                              by = 'mins'))
 }
 
@@ -35,7 +35,7 @@ event <- df %>%
                             .default= 'control')) %>%
   subset(Treatment != "rain") %>%
   ungroup() %>%
-  select('SiteID','Treatment','date_time', 'rain', 'Year','level','flow','watershed','sampleID')
+  dplyr::select('SiteID','Treatment','date_time', 'rain', 'Year','level','flow','watershed','sampleID')
 
 df2 <- subset(sed2, analyte == "TSS (mg/L)")
 
@@ -64,7 +64,7 @@ load_cumulative <- load %>%
   summarize(tss_sum = sum(tss_kg_ha)) %>%
   subset(tss_sum > 0.000003977139) # sample 3010 is below detecable limit https://beta-static.fishersci.com/content/dam/fishersci/en_US/documents/programs/scientific/technical-documents/white-papers/apha-total-suspended-solids-procedure-white-paper.pdf
 
-write.csv(load_cumulative, "./data/tidy/load_event.csv",  row.names = FALSE)
+write.csv(load_cumulative, "./data/tidy/load_eventUPDATE.csv",  row.names = FALSE)
 
 
 ### Rain event calculation
@@ -77,7 +77,7 @@ rf_flags <- event %>%
   #  mutate(eventflag = ifelse(row_number() < 72 & rainflag == 0, 0, eventflag)) %>%
   #  mutate(eventid = rep(seq(1,length(rle(eventflag)$lengths)), rle(eventflag)$lengths)) 
   mutate(eventflag = ifelse(rainflag == 1,1, 
-                            ifelse(rainflag == 0 & rainlength < 72, 1,0))) %>% #72 entries or at least 12 hours (Virginia) of dry between wet events
+                            ifelse(rainflag == 0 & rainlength < 72, 1,0))) %>% #72 entries or at least 6 hours (Virginia) of dry between wet events
   mutate(eventflag = ifelse(row_number() < 72 & rainflag == 0, 0, eventflag)) %>%
   mutate(eventid = rep(seq(1,length(rle(eventflag)$lengths)), rle(eventflag)$lengths)) 
 
@@ -96,7 +96,7 @@ rain_pivot <- rf_flags %>%
 
 rain_event <- rain_pivot[rain_pivot$precipitation > 0.00635, ] #>6.35 mm of rain (Osterholz et al. 2021)
 
-write.csv(rain_event, "./data/tidy/rain_event12.csv",  row.names = FALSE)
+write.csv(rain_event, "./data/tidy/rain_event12UPDATE.csv",  row.names = FALSE)
 
 ## Sample+Rain event calculation
 rf_times <- rain_event
@@ -116,12 +116,14 @@ rf_joined <- rf_newtimes %>%
   select(SiteID, Year, precipitation, rain_time, date_time, sampleID, rf_event)
 
 rf_cumulative <- rf_joined %>%
-  group_by(Year, SiteID, rf_event, rain_time, sampleID) %>% 
-  summarize(rain = sum(precipitation)) %>%
-  ungroup() %>%
-  distinct(Year, SiteID, rain_time, sampleID, rain)
+  distinct(Year, SiteID, rain_time, sampleID, precipitation) %>%
+  group_by(Year, SiteID, sampleID) %>% 
+  summarize(rain = sum(precipitation),
+            rain_min = sum(rain_time),
+            rf_count = n()) %>%
+  ungroup() #%>%
 
-write.csv(rf_cumulative, "./data/tidy/rfSed2_event12.csv",  row.names = FALSE)
+write.csv(rf_cumulative, "./data/tidy/rfSed2_event12UPDATE.csv",  row.names = FALSE)
 
 
 ### Runoff event calculation
@@ -134,7 +136,7 @@ ro_flags <- event %>%
   #  mutate(eventflag = ifelse(row_number() < 72 & roflag == 0, 0, eventflag)) %>%
   #  mutate(eventid = rep(seq(1,length(rle(eventflag)$lengths)), rle(eventflag)$lengths)) 
   mutate(eventflag = ifelse(roflag == 1,1, 
-                            ifelse(roflag == 0 & rolength < 144, 1,0))) %>% #72 entries or at least 12 hours (Virginia) of dry between wet events
+                            ifelse(roflag == 0 & rolength < 144, 1,0))) %>% #144 entries or at least 12 hours (Virginia) of dry between wet events
   mutate(eventflag = ifelse(row_number() < 144 & roflag == 0, 0, eventflag)) %>%
   mutate(eventid = rep(seq(1,length(rle(eventflag)$lengths)), rle(eventflag)$lengths)) 
 
@@ -149,19 +151,18 @@ ro_event <- ro_flags %>%
     eventEnd = last(date_time)
   ) %>% 
   # Compute time difference as duration of event, add 1 hour, knowing that the timestamp is the time when the rain record ends
-  mutate(flow_time = as.numeric(difftime(eventEnd,eventStart, units = 'm')) + 1)
+  mutate(flow_time = as.numeric(difftime(eventEnd,eventStart, units = 'm')) + 1) %>%
+  subset(subset=!(SiteID=="WOR" & Treatment == "control" & Year == 2018 & eventid == 4))
 
 ## **manual edit WOR 2018 RO 4 (WQ samples: 3010, 3016, 3019, 3027, 3030, 3035, 3039, 3044)**
-write.csv(ro_event, "./data/tidy/runoff_event12.csv",  row.names = FALSE) 
+write.csv(ro_event, "./data/tidy/runoff_event12UPDATE.csv",  row.names = FALSE) 
 
 
 ## Sample+Runoff event calculation
-ro_times <- read.csv("./data/tidy/runoff_event12.csv")
+#ro_times <- read.csv("./data/tidy/runoff_event12UPDATE.csv")
+ro_times <- ro_event
 
 ro_newtimes <- ro_times %>%
-  mutate(Treatment = recode(Treatment, 
-                     'treatment' = 'strips', 
-                     .default= 'control')) %>%
   group_by(SiteID, Year, Treatment, eventid, flow, flow_time) %>%
   do(add_dates(.)) %>%
   ungroup()
@@ -171,15 +172,33 @@ ro_joined <- ro_newtimes %>%
   left_join(load, by = c("SiteID", "Treatment", "date_time")) %>%
   group_by(SiteID, Treatment, Year.x, eventid, flow_time) %>% 
   mutate(ro_event = eventid,
-         Year = Year.x) #%>%
+         Year = Year.x)
   #drop_na(sampleID) %>%
   #ungroup() %>%
   #select(SiteID, Year, Treatment, flow, flow_time, date_time, sampleID, tss_kg_ha, area_ha, ro_event)
 
 ro_cumulative <- ro_joined %>%
-  group_by(Year, SiteID, ro_event, Treatment, flow, flow_time, sampleID) %>% 
+  group_by(Year, SiteID, Treatment, sampleID, flow_time, flow) %>% 
   summarize(tss_sum = sum(tss_kg_ha)) %>%
+  ungroup() %>%
+  group_by(Year, SiteID, Treatment, sampleID) %>%
+  summarize(tss_sum = sum(tss_sum),
+            flow_sum = sum(flow),
+            flow_min = sum(flow_time),
+            ro_count = n()) %>%
   subset(tss_sum > 0.000003977139) # sample 3010 is below detecable limit https://beta-static.fishersci.com/content/dam/fishersci/en_US/documents/programs/scientific/technical-documents/white-papers/apha-total-suspended-solids-procedure-white-paper.pdf
 
 
-write.csv(ro_cumulative, "./data/tidy/roSed2_event12.csv",  row.names = FALSE)
+write.csv(ro_cumulative, "./data/tidy/roSed2_event12UPDATE.csv",  row.names = FALSE)
+
+##Merging Sample+Runoff+Rain events into flume_event
+rfro_joined <- ro_cumulative %>% 
+  left_join(rf_cumulative, by = c("SiteID", "sampleID")) %>%
+  drop_na(rain) %>%
+  mutate(Year = Year.x) %>%
+  select(SiteID, Year, Treatment, sampleID, tss_sum, flow_sum, flow_min, 
+         ro_count, rf_count, rain, rain_min)
+
+write.csv(rfro_joined, "./data/tidy/rf6ro12event_UPDATE.csv",  row.names = FALSE)
+  
+  
