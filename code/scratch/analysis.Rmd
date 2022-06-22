@@ -27,7 +27,7 @@ library("stringr")
 library("ggplot2")
 
 
-options(width = 120)
+options(width = 120, scipen = 999)
 
 dir.create("fig", showWarnings = FALSE)
 ```
@@ -44,6 +44,11 @@ sessionInfo()
 
 ```{r load, dependson= "full_dataframe"}
 load("full_df.RData")
+
+#full_df <- read_csv("../data/tidy/full_df_in.csv") %>%
+#  mutate(Year = factor(Year),
+#         Treatment = factor(Treatment, levels=c('strips','control')))
+
 
 ```
 
@@ -91,7 +96,7 @@ g
 
 
 h <- ggplot(full_df, aes(x=log(ppt_sum), y=log(tss_load+0.0016488035), color=Treatment), inherit.aes = FALSE) +
-  geom_point() + 
+  geom_point(aes(shape=Year)) + 
   #scale_y_log10() +
   geom_smooth(method=lm, se=TRUE, fullrange=TRUE) +
   ggtitle("Log-log relationship between TSS load and rainfall accumulation \n(full dataset)") +
@@ -192,7 +197,7 @@ There are three main analyses of interest:
 ### Treatment effect
 
 ```{r design_model, dependson = "load"}
-m_flume <- lmerTest::lmer(log(tss_load+0.0016488035) ~ 
+m_flume <- lmerTest::lmer(log(tss_load+0.025) ~ 
                              Treatment*ln_ppt +
                             
                             Year*Treatment +
@@ -205,6 +210,8 @@ m_flume <- lmerTest::lmer(log(tss_load+0.0016488035) ~
                           data = full_df)
 
 summary(m_flume)
+anova(m_flume)
+performance::r2(m_flume)
 
 ```
 
@@ -240,7 +247,7 @@ year = emmeans(m_flume, ~ Year,
 confint(year)
 
 trt_ppt = emmeans(m_flume, pairwise ~ Treatment|ln_ppt,
-                    at=list(ln_ppt=c(-4,-3.5,-3,-2)), 
+                    at=list(ln_ppt=c(-4,-3.5,-3.05,-3,-2)), 
                     type = "response",
                     lmer.df = "asymptotic")
 
@@ -251,6 +258,8 @@ confint(trt_ppt)$contrasts ## exp. the values
 #                    lmer.df = "asymptotic")
 
 #confint(crop)$contrasts
+
+#pred <- exp(predictInterval(m_flume, newdata = full_df, n.sims = 1000))
 
 ```
 

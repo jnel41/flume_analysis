@@ -120,20 +120,21 @@ There are three main analyses of interest:
 
 
 ```{r designR_model, dependson = "flume_random"}
-mR_flume <- lmerTest::lmer(log(tss_load+0.0016488035) ~ 
+mR_flume <- lmerTest::lmer(log(tss_load+0.025) ~ 
                              Treatment*ln_ppt +
                             Year*Treatment +
                             
                             (1 | SiteID) + 
-                             (1 | SiteID:Treatment) + #removed due to singular fit
-                            #(1|Year:sample_event) + #removed due to singular fit
-                            (1|SiteID:Year:sample_event), 
+                             #(1 | SiteID:Treatment) + #removed due to singular fit
+                            (1|Year:sample_event),# + #removed due to singular fit
+                            #(1|SiteID:Year:sample_event), 
                            
                           data = flumeR)
 
 
 summary(mR_flume)
-
+anova(mR_flume)
+performance::r2(mR_flume)
 ```
 
 ```{r designR_step_model, dependson = "designR_model"}
