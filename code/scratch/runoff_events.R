@@ -1,8 +1,4 @@
 library("tidyverse"); theme_set(theme_bw())
-#library("lme4")
-#library("lmerTest")
-#library("emmeans")
-#library("ggResidpanel")
 library("data.table")
 library("stringr")
 library("lubridate")

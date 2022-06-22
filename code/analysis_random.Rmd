@@ -1,0 +1,329 @@
+---
+title: "Flume: Random Analysis (March-November)"
+subtitle: "(adapted from Jarad Niemi - Soilpad Analysis)"
+author: "Jessica Nelson"
+date: "`r Sys.Date()`"
+output:
+  pdf_document:
+    toc: yes
+  html_document:
+    toc: yes
+---
+
+```{r setup}
+knitr::opts_chunk$set(echo = TRUE,
+                      cache = TRUE,
+                      fig.width = 12,
+                      fig.height = 12)
+
+library("lme4")
+library("lmerTest")
+library("tidyverse"); theme_set(theme_bw())
+library("lattice")
+library("emmeans")
+library("ggResidpanel")
+library("data.table")
+library("stringr")
+library("ggplot2")
+library("ggpmisc")
+library("performance")
+library("multcomp")
+library("xtable")
+
+
+options(width = 120, scipen = 999)
+windowsFonts(A = windowsFont("Times New Roman")) 
+
+dir.create("fig", showWarnings = FALSE)
+```
+
+```{r}
+sessionInfo()
+```
+
+## Read in data
+
+```{r, child="sediment.Rmd"}
+```
+
+```{r load, dependson= "full_dataframe"}
+load("full_df.RData")
+```
+
+```{r flume_random, dependson = "load"}
+flumeR <- full_df %>%
+  #filter(!is.na(ro_event)) %>%
+    subset(random == 'R')
+
+```
+
+## Exploratory analysis
+
+## Site-year with rainfall event
+
+```{r, dependson="flume_random"}
+site_year_rfeventR <- flumeR %>%
+  dplyr::select(SiteID, Year, sample_event) %>%
+  unique()
+
+ggplot(site_year_rfeventR, aes(Year, SiteID, fill=sample_event)) +
+  geom_tile()
+```
+
+
+## Number of samples
+
+Calculate the number of observations for each treatment-position-year-site-time
+combination. 
+
+```{r sample_event_counts, dependson="flume_random"}
+TSS_countsR <- flumeR %>%
+  group_by(Year, SiteID, sample_event) %>%
+  distinct() %>%
+  summarize(n = n(), .groups = "drop")
+```
+
+
+```{r year_tss_sum, dependson="flume_random"}
+TSS_sumR <- flumeR %>%
+  group_by(Year, SiteID, Treatment) %>%
+  distinct() %>%
+  summarize(tss_sum = sum(tss_load), .groups = "drop")
+```
+
+Plot the number of observations for each combination. 
+
+```{r plot_count, dependson="sample_event_counts", out.width = "\\textwidth"}
+g <- ggplot(TSS_countsR, aes(x = Year, y= SiteID, fill = n)) +
+  geom_tile() +
+  geom_text(aes(label = n), color = "white") +
+  scale_fill_gradient(low = "blue", high = "red") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+g 
+##ggsave("fig/soilpad_counts_no_diversion.png", g, width = 12, height = 12)
+```
+
+
+# Main Analyses
+
+There are three main analyses of interest:
+
+- confirmatory, design-based analysis
+- exploratory, covariate analysis
+- relationship of sediment flow to sediment loss
+
+
+```{r designR_model, dependson = "flume_random"}
+<<<<<<< HEAD:code/scratch/analysis_random.Rmd
+mR_flume <- lmerTest::lmer(log(tss_load+0.025) ~ 
+=======
+mR_flume <- lmerTest::lmer(log(tss_load+0.0016) ~ 
+>>>>>>> 5543c56bb2da09fcc288c860826e8d700e90a5d1:code/analysis_random.Rmd
+                             Treatment*ln_ppt +
+                            #Treatment*crop +
+                            Year*Treatment +
+                             #Treatment*Lfactor +
+                             #Treatment*LSfactor +
+                             #Treatment*Sfactor +
+                             #Treatment*slope75 +
+                            
+<<<<<<< HEAD:code/scratch/analysis_random.Rmd
+                            (1 | SiteID) + 
+                             #(1 | SiteID:Treatment) + #removed due to singular fit
+                            (1|Year:sample_event),# + #removed due to singular fit
+                            #(1|SiteID:Year:sample_event), 
+=======
+                            #(1 | SiteID) + #removed due to singular fit
+                             (1 | SiteID:Treatment) + 
+                            #(1|Year:sample_event) + #removed due to singular fit
+                            (1|SiteID:Year:sample_event), 
+>>>>>>> 5543c56bb2da09fcc288c860826e8d700e90a5d1:code/analysis_random.Rmd
+                           
+                          data = flumeR)
+
+
+summary(mR_flume)
+<<<<<<< HEAD:code/scratch/analysis_random.Rmd
+anova(mR_flume)
+performance::r2(mR_flume)
+=======
+#confint(mR_flume, oldNames = FALSE)
+anova(mR_flume)
+r2_nakagawa(mR_flume)
+icc(mR_flume)
+
+>>>>>>> 5543c56bb2da09fcc288c860826e8d700e90a5d1:code/analysis_random.Rmd
+```
+
+```{r designR_step_model, dependson = "designR_model"}
+mR_flume_step <- step(mR_flume, reduce.random = FALSE, alpha.fixed = 0.1)
+mR_flume_model <- get_model(mR_flume_step)
+summary(mR_flume_model)
+
+##https://campus.datacamp.com/courses/hierarchical-and-mixed-effects-models-in-r/linear-mixed-effect-models?ex=7
+```
+
+
+```{r designR_model_contrasts, dependson = "designR_model"}
+trt_yrR = emmeans(mR_flume, pairwise ~ Treatment|Year, 
+                    type = "response",
+                    lmer.df = "asymptotic") 
+confint(trt_yrR)$contrasts
+
+trtR    = emmeans(mR_flume, pairwise ~ Treatment, 
+                    type = "response", 
+                    lmer.df = "asymptotic")
+confint(trtR)
+
+yearR   = emmeans(mR_flume, ~ Year, 
+                    type = "response",
+                    lmer.df = "asymptotic") 
+confint(yearR)
+
+trt_pptR  = emmeans(mR_flume, pairwise ~ Treatment|ln_ppt,
+                    at=list(ln_ppt=c(-4,-3,-2,-1,-0.25)), 
+                    type = "response",
+                    lmer.df = "asymptotic")
+
+confint(trt_pptR)$contrasts ## exp. the values
+
+#cropR      = emmeans(mR_flume, pairwise ~ Treatment|crop,   
+#                    type = "response",
+#                    lmer.df = "asymptotic")
+
+#confint(cropR)
+```
+
+```{r, dependson="load"}
+h <- ggplot(flumeR, aes(x=log(ppt_sum), y=log(tss_load+0.0016), color=Treatment), inherit.aes = FALSE) +
+ scale_color_manual(values = c("control" = "#C38820",
+                              "strips" = "#176D9C"),
+                    labels=c("Control", "Prairie Strip"),
+                    name  ="") +
+ geom_point(size=5) +
+ xlab("log(Rainfall Total (mm))") +
+ ylab("log(TSS Load (kg/ha))") +
+ geom_smooth(method=lm, se=FALSE, fullrange=TRUE, size=3) +
+ ggtitle("B. Randomized Location Subset (Out)") +
+ theme(plot.title = element_text(family="A", size=28, face="bold", hjust=0.5),
+       axis.title.x = element_text(family="A", size=28, face="bold"),
+       axis.title.y = element_text(family="A", size=28, face="bold"),
+       axis.text.x = element_text(family="A", size=28),
+       axis.text.y = element_text(family="A", size=28),
+       legend.text = element_text(family = "A", size=28),
+       legend.key.size = unit(3,"line")) +
+ stat_poly_eq(formula = y ~ x,
+              aes(label = paste(..eq.label.., ..rr.label.., ..p.value.label.., sep = "*`,`~")),
+              parse = TRUE,
+              label.x.npc = "left",
+              label.y.npc = "top",
+              vstep = 0.05,
+              size = 8)
+
+h
+ggsave("E:/ISU/Project/SoilMove/data/statistics/flume_analysis/code/fig/randReg_ppt_loadOUT.png", h, width = 12, height = 12)
+```
+
+# Check assumptions
+
+There are two possible models:
+
+- mR_flume: full model design, design-based analysis
+- mR_flume_model: model design selected based on backward step selection
+
+### Full model design
+
+```{r designR_model_residual_plots, dependson = "designR_model"}
+resid_panel(mR_flume, 
+            plots = c("resid","index","yvp","qq"),
+            smoother = TRUE, qqbands = TRUE)
+
+resid_xpanel(mR_flume)
+```
+
+```{r designR_step_residual_plots, dependson = "designR_model"}
+resid_panel(mR_flume_model, 
+            plots = c("resid","index","yvp","qq"),
+            smoother = TRUE, qqbands = TRUE)
+
+resid_xpanel(mR_flume_model)
+```
+
+```{r designR_model_figure, dependson="load"}
+groupR <- flumeR %>% 
+  group_by(Treatment) %>% 
+  summarize(n = n(), 
+            mean = mean(tss_load), 
+            sd = sd(tss_load),
+            .groups = "drop") %>%
+  mutate(se = sd / sqrt(n),
+         lb = mean + qt(0.025, df = n-1)*se,
+         ub = mean - qt(0.025, df = n-1)*se)
+
+trt_plotR <- groupR %>%
+  ggplot(aes(x=Treatment, y=mean, fill=Treatment))+
+  geom_bar(width = 0.5, position = position_dodge(), stat="summary") +
+  geom_errorbar(aes(ymin = (mean-se), ymax = (mean+se)),
+                width = 0.3,
+                linetype = "solid",
+                position = position_dodge(width = 0.5),
+                color="black", size=0.7) +
+  scale_fill_manual(values = c("control" = "#C38820",
+                              "strips" = "#176D9C")) +
+  ggtitle("B. Randomized Location Subset") +
+  xlab("Treatment") +
+  ylab("TSS Load (kg/ha)") +
+  theme(plot.title = element_text(family = "A", size=28, face="bold", hjust=0.5),
+       axis.title.x = element_text(family = "A", size=28, face="bold"),
+       axis.title.y = element_text(family = "A", size=28, face="bold"),
+       axis.text.x = element_text(family = "A", size=28),
+       axis.text.y = element_text(family = "A", size=28)) +
+  scale_x_discrete(labels= c("Prairie Strip", "Control")) +
+  scale_y_continuous(limits = c(0, 50)) +
+  theme(text = element_text())
+
+trt_plotR
+ggsave("E:/ISU/Project/SoilMove/data/statistics/flume_analysis/code/fig/randflume_plot.png", trt_plotR)
+
+```
+
+
+```{r extract-contrast-ci, dependson="design_model"}
+extract_contrast_ci <- function(d) {
+  mR <- lmerTest::lmer(update(mR_flume, 
+                          as.formula(paste0("~.+",d$variable))),
+                    data = flumeR) 
+    
+  # Obtain coefficient for new variable
+  av <- anova(mR)
+  rowid <- which(rownames(av) == d$variable)
+  
+   
+  em <- emmeans(mR, 
+                pairwise ~ Treatment, 
+                type = "response", 
+                lmer.df = "asymptotic")
+  
+  cbind(
+    av[rowid,] %>% as.data.frame,
+    confint(em)$contrasts %>% as.data.frame
+  )
+}
+```
+
+
+```{r treatment-effect-with-explanatory-variables, dependson=c("extract-contrast-ci")}
+add <- data.frame(variable = c("slope75", "C_factor", "K_factor", "LSfactor", "Lfactor", "Sfactor", "post_Lupslp", "post_Tupslp", "ln_ppt", "pre_Lupslp"))
+
+added_variable_analysesR <- add %>% 
+  group_by(variable) %>%
+  do(extract_contrast_ci(.))
+```
+
+
+```{r print-added-variable-analysis, dependson="treatment-effect-with-explanatory-variables", results='asis'}
+added_variable_analysesR %>%
+  xtable() %>%
+  print(type="html", include.rownames=FALSE)
+```

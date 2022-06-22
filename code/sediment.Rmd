@@ -11,7 +11,9 @@ output:
 
 library("tidyverse")
 
-flume <- read_csv("../data/tidy/flume_event_data612_UPDATE.csv") %>%
+options(scipen = 999)
+
+flume <- read_csv("../data/tidy/rf12ro12event_UPDATEmanual.csv") %>%
   mutate(Year = factor(Year)) %>%
   subset(SiteID != 'MAR') %>%
   subset(subset=!(SiteID=="MCN" & Year == 2016)) %>%
@@ -21,19 +23,19 @@ flume <- read_csv("../data/tidy/flume_event_data612_UPDATE.csv") %>%
   subset(subset=!(SiteID=="MCN" & Year == 2020)) %>%
   subset(subset=!(SiteID=="RHO" & Year == 2016)) %>%
   subset(subset=!(SiteID=="RHO" & Year == 2017)) %>%
-  subset(subset=!(SiteID == "WOR" & Year == 2018 & precipitation == "NA"))
+  subset(subset=!(SiteID == "WOR" & Year == 2018 & rain == "NA"))
 
 ```
 
 ```{r total, dependson="create_sediment"}
 flume_sum <- flume %>%
-  group_by(Treatment, Year, SiteID, sample_event, tss_sum, crop, slope75, Lsfactor) %>%
+  group_by(Treatment, Year, SiteID, sample_event, tss_sum, crop, slope75, LSfactor, Lfactor, Sfactor, C_factor, K_factor, post_Lupslp, post_Tupslp, pre_Lupslp) %>%
   summarize(tss_load = tss_sum) %>%
   distinct() 
 
 
 ppt_sum <- flume %>%
-  group_by(Treatment, Year, SiteID, sample_event, crop, Lsfactor, slope75) %>%
+  group_by(Treatment, Year, SiteID, sample_event, crop, slope75, LSfactor, Lfactor, Sfactor, C_factor, K_factor, post_Lupslp, post_Tupslp, pre_Lupslp) %>%
   #group_by(Treatment, Year, SiteID, sample_event, crop) %>%
   summarize(ppt_sum = sum(precipitation)) %>%
   ungroup() %>%
@@ -43,16 +45,16 @@ ppt_sum <- flume %>%
 
 
 ```{r pivot tables, dependson = "total"}
-sample_anova <- flume_sum %>%
+sampl_anova <- flume_sum %>%
   filter(!is.na(tss_sum)) %>%
-  select(Year, SiteID, Treatment, sample_event, tss_sum, crop) %>%
+  dplyr::select(Year, SiteID, Treatment, sample_event, tss_sum, crop) %>%
   group_by(SiteID, Year, Treatment, sample_event, crop) %>%
-    summarize(tss_load = sum(tss_sum)) %>% 
+  summarize(tss_load = sum(tss_sum)) %>% 
   ungroup() %>%
-  select(Year, SiteID, Treatment, sample_event, tss_load, crop) %>%
+  dplyr::select(Year, SiteID, Treatment, sample_event, tss_load, crop) %>%
   pivot_wider(names_from = Treatment, values_from = tss_load)
 
-pivot_sample <- sample_anova %>%
+pivot_sample <- sampl_anova %>%
   inner_join(ppt_sum,by=c("SiteID", "Year", "sample_event", "crop")) %>%
   filter(!is.na(strips)) %>%
   mutate(ln_ppt = log(ppt_sum)) %>%
@@ -62,9 +64,10 @@ long_load <- pivot_sample %>%
   gather(Treatment, tss_load, control:strips) %>%
   arrange(Treatment, tss_load) %>%
   filter(!is.na(diff)) %>%
-  select(SiteID, Treatment, Year, sample_event, tss_load, ppt_sum, crop, slope75, Lsfactor)
+  dplyr::select(SiteID, Treatment, Year, sample_event, tss_load, ppt_sum, crop)
 
 ```
+
 
 ```{r random coding, dependson = "pivot tables"}
 rf_ro_pivot <- long_load %>%
@@ -87,17 +90,24 @@ long_load <- long_load %>%
 ```
 
 ```{r full_dataframe, dependson = "random coding"}
-full_df <- rf_ro_pivot %>%
-  inner_join(ppt_sum,by=c("SiteID", "Year", "sample_event","crop")) %>%
-  drop_na(tss_load) %>%
-  mutate(ppt_sum = ppt_sum.x,
-         ln_ppt = log(ppt_sum.x),
-         Treatment = factor(Treatment.x, levels=c('strips','control'))) %>%
-  subset(select = -c(Treatment.y, Treatment.x, ppt_sum.x, ppt_sum.y)) %>%
+#full_df <- rf_ro_pivot %>%
+full_df <- flume %>%
+  #inner_join(ppt_sum,by=c("SiteID", "Year", "sample_event","crop")) %>%
+  drop_na(tss_sum) %>%
+  mutate(#ppt_sum = ppt_sum.x,
+         ln_ppt = log(rain),
+         Treatment = factor(Treatment, levels=c('strips','control')),
+         ln_slp = log(slope75),
+         ln_LS = log(LSfactor),
+         ln_L = log(Lfactor),
+         ln_S = log(Sfactor),
+         ln_postL = log(post_Lupslp),
+         ln_postT = log(post_Tupslp)) %>%
+  #subset(select = -c(Treatment.y, Treatment.x, ppt_sum.x, ppt_sum.y)) %>%
   arrange(Year, SiteID, Treatment, sample_event)
 
 save(full_df, file = "full_df.RData")
 
-#write.csv(full_df,"D:/ISU/ResearchProject/flume_analysis/data/tidy/full_df.csv", row.names = FALSE)
+write.csv(full_df,"../data/tidy/full_df.csv", row.names = FALSE)
 
 ```

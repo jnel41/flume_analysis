@@ -1,0 +1,506 @@
+---
+title: "Flume: Full Analysis (March-November)"
+subtitle: "(adapted from Jarad Niemi - Soilpad Analysis)"
+author: "Jessica Nelson"
+date: "`r Sys.Date()`"
+output:
+  pdf_document:
+    toc: yes
+  html_document:
+    toc: yes
+---
+
+```{r setup}
+knitr::opts_chunk$set(echo = TRUE,
+                      cache = TRUE,
+                      fig.width = 12,
+                      fig.height = 12)
+
+library("lme4")
+library("lmerTest")
+library("tidyverse"); theme_set(theme_bw())
+library("lattice")
+library("emmeans")
+library("ggResidpanel")
+library("data.table")
+library("stringr")
+library("ggplot2")
+library("ggpmisc")
+library("performance")
+library("multcomp")
+library("xtable")
+
+
+options(width = 120, scipen = 999)
+windowsFonts(A = windowsFont("Times New Roman")) 
+
+dir.create("fig", showWarnings = FALSE)
+```
+
+```{r}
+sessionInfo()
+```
+
+## Read in data
+```{r load, dependson= "full_dataframe"}
+full_out <- read_csv("../data/tidy/full_df_out.csv") %>%
+  mutate(Year = factor(Year),
+         Treatment = factor(Treatment, levels=c('strips','control')))
+
+full_in <- read_csv("../data/tidy/full_df_in.csv") %>%
+  mutate(Year = factor(Year),
+         Treatment = factor(Treatment, levels=c('strips','control')))
+
+```
+
+
+## Exploratory analysis
+
+## Flume Out: Site-year with sample event
+
+```{r, dependson="load"}
+site_year_eventOut <- full_out %>%
+  dplyr::select(SiteID, Year, sample_event) %>%
+  unique()
+
+ggplot(site_year_eventOut, aes(Year, SiteID, fill=sample_event)) +
+  geom_tile()
+```
+
+## Flume In: Site-year with sample event
+
+```{r, dependson="load"}
+site_year_eventIn <- full_in %>%
+  dplyr::select(SiteID, Year, sample_event) %>%
+  unique()
+
+ggplot(site_year_eventIn, aes(Year, SiteID, fill=sample_event)) +
+  geom_tile()
+```
+
+## Data visualization
+
+## Number of samples: Flume Out
+
+Calculate the number of observations for each treatment-position-year-site-time
+combination. 
+
+```{r sample_event_counts, dependson="load"}
+out_counts <- full_out %>%
+  group_by(Year, SiteID, Treatment, random) %>%
+  distinct() %>%
+  summarize(n = n(), .groups = "drop")
+```
+
+Plot the number of observations for each combination. 
+
+```{r plot_count, dependson="sample_event_counts", out.width = "\\textwidth"}
+gOut = ggplot(out_counts, aes(x = Treatment, y = SiteID, fill = n)) +
+  geom_tile() +
+  geom_text(aes(label = n), color = "white") +
+  facet_grid(random ~ Year) +
+  scale_fill_gradient(low = "blue", high = "black") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+gOut
+
+```
+
+
+```{r mean_data, dependson = "load"}
+load_out <- full_out %>%
+  group_by(Year, SiteID, Treatment, crop) %>%
+  summarize(sum_load             = sum(tss_load, na.rm = TRUE),
+            log_load = mean(log(sum_load), na.rm = TRUE),
+            n                   = n(),
+            .groups = "drop")
+
+```
+
+
+```{r wp_per_day_plot, dependson = "plot_data"}
+gOut <- ggplot(load_out, 
+           aes(x = Treatment, 
+               y = sum_load)) + 
+  geom_point() + 
+  geom_line() +
+  facet_grid(SiteID ~ Year, scales = "free_y") + 
+  labs(title ="Total load (kg/ha) per field season") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+gOut
+
+#ggsave("fig/wp_per_day_plot.png", gOut)
+```
+
+
+## Number of samples: Flume In
+
+Calculate the number of observations for each treatment-position-year-site-time
+combination. 
+
+```{r sample_event_counts, dependson="load"}
+in_counts <- full_in %>%
+  group_by(Year, SiteID, Treatment, random) %>%
+  distinct() %>%
+  summarize(n = n(), .groups = "drop")
+```
+
+Plot the number of observations for each combination. 
+
+```{r plot_count, dependson="sample_event_counts", out.width = "\\textwidth"}
+gIn = ggplot(in_counts, aes(x = Treatment, y = SiteID, fill = n)) +
+  geom_tile() +
+  geom_text(aes(label = n), color = "white") +
+  facet_grid(random ~ Year) +
+  scale_fill_gradient(low = "blue", high = "black") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+gIn
+```
+
+
+```{r mean_data, dependson = "load"}
+load_in <- full_out %>%
+  group_by(Year, SiteID, Treatment, crop) %>%
+  summarize(sum_load             = sum(tss_load, na.rm = TRUE),
+            log_load = mean(log(sum_load), na.rm = TRUE),
+            n                   = n(),
+            .groups = "drop")
+
+```
+
+
+```{r wp_per_day_plot, dependson = "plot_data"}
+gIn <- ggplot(load_in, 
+           aes(x = Treatment, 
+               y = sum_load)) + 
+  geom_point() + 
+  geom_line() +
+  facet_grid(SiteID ~ Year, scales = "free_y") + 
+  labs(title ="Total load (kg/ha) per field season") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+gIn
+
+#ggsave("fig/wp_per_day_plot.png", gIn)
+```
+
+
+# Main Analyses
+
+There are three main analyses of interest:
+
+- confirmatory, design-based analysis
+- exploratory, covariate analysis
+- relationship of sediment flow to sediment loss
+
+## Confirmatory, design-based analysis
+
+### Treatment effect: Flume Out
+
+```{r design_model_Out, dependson = "load"}
+mOut <- lmerTest::lmer(log(tss_load+0.0016) ~ 
+                             Treatment*ln_ppt +
+                            Treatment*crop +
+                            Year*Treatment +
+                            
+                            #(1 | SiteID) + #removed due to singular fit
+                             (1 | SiteID:Treatment) + 
+                            (1|Year:sample_event) + #consider this and below with SiteID 
+                            (1|SiteID:Year:sample_event), 
+                          
+                          data = full_out)
+
+summary(mOut)
+confint(mOut, oldNames = FALSE)
+anova(mOut)
+r2_nakagawa(mOut)
+icc(mOut)
+
+```
+
+```{r design_model_Outstep, dependson = "design_model_Out"}
+mOut_step <- step(mOut, reduce.random = FALSE, alpha.fixed = 0.1)
+mOut_model <- get_model(mOut_step)
+summary(mOut_model)
+
+##https://campus.datacamp.com/courses/hierarchical-and-mixed-effects-models-in-r/linear-mixed-effect-models?ex=7
+```
+
+# Check assumptions
+
+There are two possible models:
+
+- m_flume: full model design, design-based analysis
+- m_flume_model: model design selected based on backward step selection
+
+### Full model design
+
+```{r design_Outmodel_residual_plots, dependson = "design_model_Out"}
+resid_panel(mOut, 
+            plots = c("resid","index","yvp","qq"),
+            smoother = TRUE, qqbands = TRUE)
+
+resid_xpanel(mOut)
+```
+
+### Selected model design
+```{r design_Outstep_residual_plots, dependson = "design_model_Outstep"}
+resid_panel(mOut_model, 
+            plots = c("resid","index","yvp","qq"),
+            smoother = TRUE, qqbands = TRUE)
+
+resid_xpanel(mOut_model)
+```
+
+
+```{r design_model_Out_contrasts, dependson = "design_model_Out"}
+trt_yrO = emmeans(mOut, pairwise ~ Treatment|Year, 
+                    type = "response",
+                    lmer.df = "asymptotic") 
+confint(trt_yrO)$contrasts
+
+trtO = emmeans(mOut, pairwise ~ Treatment, 
+                    type = "response", 
+                    lmer.df = "asymptotic")
+confint(trtO)
+
+yearO = emmeans(mOut, ~ Year, 
+                    type = "response",
+                    lmer.df = "asymptotic") 
+confint(yearO)
+
+cropO      = emmeans(mOut, pairwise ~ Treatment|crop,   
+                    type = "response",
+                    lmer.df = "asymptotic")
+
+confint(cropO)$contrasts
+
+```
+
+
+### Treatment effect: Flume In
+
+```{r design_model_In, dependson = "load"}
+mIn <- lmerTest::lmer(log(tss_load+0.025) ~ 
+                             Treatment*ln_ppt +
+                            Treatment*crop +
+                            Year*Treatment +
+                            
+                            #(1 | SiteID) + #removed due to singular fit
+                             (1 | SiteID:Treatment) + 
+                            (1|Year:sample_event) + #consider this and below with SiteID 
+                            (1|SiteID:Year:sample_event), 
+                          
+                          data = full_in)
+
+summary(mIn)
+confint(mIn, oldNames = FALSE)
+anova(mIn)
+r2_nakagawa(mIn)
+icc(mIn)
+
+```
+
+
+```{r design_modelstep_In, dependson = "design_model_In"}
+mIn_step <- step(mIn, reduce.random = FALSE, alpha.fixed = 0.1)
+mIn_model <- get_model(mIn_step)
+summary(mIn_model)
+
+##https://campus.datacamp.com/courses/hierarchical-and-mixed-effects-models-in-r/linear-mixed-effect-models?ex=7
+```
+
+
+# Check assumptions
+
+There are two possible models:
+
+- m_flume: full model design, design-based analysis
+- m_flume_model: model design selected based on backward step selection
+
+### Full model design
+
+```{r design_Inmodel_residual_plots, dependson = "design_model_In"}
+resid_panel(mOut, 
+            plots = c("resid","index","yvp","qq"),
+            smoother = TRUE, qqbands = TRUE)
+
+resid_xpanel(mOut)
+```
+
+### Selected model design
+```{r design_Instep_residual_plots, dependson = "design_modelstep_In"}
+resid_panel(m_flume_model, 
+            plots = c("resid","index","yvp","qq"),
+            smoother = TRUE, qqbands = TRUE)
+
+resid_xpanel(m_flume_model)
+```
+
+
+```{r design_model_In_contrasts, dependson = "design_model_In"}
+trt_yrI = emmeans(mIn, pairwise ~ Treatment|Year, 
+                    type = "response",
+                    lmer.df = "asymptotic") 
+confint(trt_yrI)$contrasts
+
+trtI = emmeans(mIn, pairwise ~ Treatment, 
+                    type = "response", 
+                    lmer.df = "asymptotic")
+confint(trtI)
+
+yearI = emmeans(mIn, ~ Year, 
+                    type = "response",
+                    lmer.df = "asymptotic") 
+confint(yearI)
+
+cropI      = emmeans(mIn, pairwise ~ Treatment|crop,   
+                    type = "response",
+                    lmer.df = "asymptotic")
+
+confint(cropI)$contrasts
+
+```
+
+
+## Analysis results visualization
+
+## Mean TSS load: Flume Out
+
+```{r mean_tss_figure_Out, dependson="design_model_Out_contrasts"}
+trt_frameO <- as.data.frame(trtO)
+ 
+kO <- trt_frameO %>%
+  filter(contrast != "strips - control")
+ 
+ trt_plotO <- kO %>%
+   ggplot(aes(x=Treatment, y=response, fill=Treatment))+
+   geom_bar(width = 0.5, position = position_dodge(), stat="summary") +
+   geom_errorbar(aes(ymin = (response-asymp.LCL), ymax = (response+asymp.UCL)),
+             width = 0.2,
+             linetype = "solid",
+             position = position_dodge(width = 0.5),
+             color="black", size=0.7) +
+   scale_fill_manual(values = c("control" = "#176D9C",
+                                "strips" = "#C38820")) +
+   ggtitle("Comparison of Total Suspended Sediment (TSS) loads \n (Full Dataset: Out)") +
+   xlab("Treatment") +
+   ylab("TSS Load \n(kg/ha)") +
+   theme(plot.title = element_text(size=20, face="bold", hjust=0.5),
+         axis.title.x = element_text(size=18, face="bold"),
+         axis.title.y = element_text(size=18, face="bold"),
+         axis.text.x = element_text(size=18),
+         axis.text.y = element_text(size=18)) +
+   scale_x_discrete(labels= c("Control", "Prairie Strip"))
+ 
+trt_plotO
+
+```
+
+## Mean TSS load: Flume In
+
+```{r mean_tss_figure_In, dependson="design_model_In_contrasts"}
+trt_frameI <- as.data.frame(trtI)
+ 
+kI <- trt_frameI %>%
+  filter(contrast != "strips - control")
+ 
+ trt_plotI <- kI %>%
+   ggplot(aes(x=Treatment, y=response, fill=Treatment))+
+   geom_bar(width = 0.5, position = position_dodge(), stat="summary") +
+   geom_errorbar(aes(ymin = (response-asymp.LCL), ymax = (response+asymp.UCL)),
+             width = 0.2,
+             linetype = "solid",
+             position = position_dodge(width = 0.5),
+             color="black", size=0.7) +
+   scale_fill_manual(values = c("control" = "#176D9C",
+                                "strips" = "#C38820")) +
+   ggtitle("Comparison of Total Suspended Sediment (TSS) loads \n (Full Dataset: In)") +
+   xlab("Treatment") +
+   ylab("TSS Load \n(kg/ha)") +
+   theme(plot.title = element_text(size=20, face="bold", hjust=0.5),
+         axis.title.x = element_text(size=18, face="bold"),
+         axis.title.y = element_text(size=18, face="bold"),
+         axis.text.x = element_text(size=18),
+         axis.text.y = element_text(size=18)) +
+   scale_x_discrete(labels= c("Control", "Prairie Strip"))
+ 
+trt_plotI
+
+```
+
+
+
+
+```{r extract-contrast-ci, dependson="design_model"}
+extract_contrast_ci <- function(d) {
+  m <- lmerTest::lmer(update(m_flume, 
+                          as.formula(paste0("~.+",d$variable))),
+                    data = full_df) 
+    
+  # Obtain coefficient for new variable
+  av <- anova(m)
+  rowid <- which(rownames(av) == d$variable)
+  
+   
+  em <- emmeans(m, 
+                pairwise ~ Treatment, 
+                type = "response", 
+                lmer.df = "asymptotic")
+  
+  cbind(
+    av[rowid,] %>% as.data.frame,
+    confint(em)$contrasts %>% as.data.frame
+  )
+}
+```
+
+
+```{r treatment-effect-with-explanatory-variables, dependson=c("extract-contrast-ci")}
+add <- data.frame(variable = c("slope75", "C_factor", "K_factor", "LSfactor", "Lfactor", "Sfactor", 
+               "post_Lupslp", "post_Tupslp", "ln_ppt", "pre_Lupslp"))
+
+added_variable_analyses <- add %>% 
+  group_by(variable) %>%
+  do(extract_contrast_ci(.))
+```
+
+
+```{r print-added-variable-analysis, dependson="treatment-effect-with-explanatory-variables", results='asis'}
+added_variable_analyses %>%
+  xtable() %>%
+  print(type="html", include.rownames=FALSE)
+```
+
+### Rainfall vs. Load: Flume Out
+```{r, dependson="load"}
+hOut <- ggplot(full_out, aes(x=log(ppt_sum), y=log(tss_load+0.0016), color=Treatment), inherit.aes = FALSE) +
+ scale_color_manual(values = c("control" = "#C38820",
+                              "strips" = "#176D9C"),
+                  #labels=c( "Control", "Prairie Strip"),
+                    name  ="") +
+ geom_point(size=5) +
+ xlab("log(Rainfall Total (mm))") +
+ ylab("log(TSS load (kg/ha))") +
+ geom_smooth(method=lm, se=FALSE, fullrange=TRUE, size=3) +
+ ggtitle("A. Full Dataset (Out)") +
+ theme(plot.title = element_text(family="A", size=28, face="bold", hjust=0.5),
+       axis.title.x = element_text(family="A", size=28, face="bold"),
+       axis.title.y = element_text(family="A", size=28, face="bold"),
+       axis.text.x = element_text(family="A", size=28),
+       axis.text.y = element_text(family="A", size=28),
+       legend.text = element_text(family = "A", size=28),
+       legend.key.size = unit(3,"line")) +
+ stat_poly_eq(formula = y ~ x,
+              aes(label = paste(..eq.label.., ..rr.label.., ..p.value.label.., sep = "*`,`~")),
+              parse = TRUE,
+              label.x.npc = "left",
+              label.y.npc = "top",
+              vstep = 0.05,
+              size = 8)
+
+hOut
+
+#ggsave("E:/ISU/Project/SoilMove/data/statistics/flume_analysis/code/fig/Reg_ppt_loadOUT.png", hOut, width = 12, height = 12)
+
+```

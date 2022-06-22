@@ -1,0 +1,304 @@
+---
+title: "Flume: Full Analysis (March-November)"
+subtitle: "(adapted from Jarad Niemi - Soilpad Analysis)"
+author: "Jessica Nelson"
+date: "`r Sys.Date()`"
+output:
+  pdf_document:
+    toc: yes
+  html_document:
+    toc: yes
+---
+
+```{r setup}
+knitr::opts_chunk$set(echo = TRUE,
+                      cache = TRUE,
+                      fig.width = 12,
+                      fig.height = 12)
+
+library("tidyverse"); theme_set(theme_bw())
+library(cowplot) #for manuscript ready figures
+library(lme4) #for lmer & glmer models
+library(sjPlot) #for plotting lmer and glmer mods
+library(sjmisc) 
+library(effects)
+library(sjstats)
+
+options(width = 120, scipen = 999)
+
+dir.create("fig", showWarnings = FALSE)
+```
+
+```{r}
+sessionInfo()
+```
+
+
+```{r load, dependson= "full_dataframe"}
+load("E:/ISU/Project/SoilMove/data/statistics/flume_analysis/code/full_df.RData")
+
+rain_event <- read.csv('E:/ISU/Project/SoilMove/data/statistics/flume_analysis/data/tidy/rain_event12.csv', header=TRUE)
+
+rain_event <- rain_event %>% filter(!duplicated(cbind(Year, SiteID, eventStart)))
+
+runoff_event <- read.csv('E:/ISU/Project/SoilMove/data/statistics/flume_analysis/data/tidy/runoff_event12.csv', header=TRUE)
+
+```
+
+## Exploratory analysis
+
+## Site-year with sample event
+
+```{r, dependson="load"}
+site_year_rfevent <- full_df %>%
+  select(SiteID, Year, sample_event) %>%
+  unique()
+
+ggplot(site_year_rfevent, aes(Year, SiteID, fill=sample_event)) +
+  geom_tile()
+```
+
+```{r mean_data, dependson = "load"}
+ppt_sum <- rain_event %>%
+  filter(!duplicated(cbind(Year, SiteID, eventStart))) %>%
+  group_by(Year, SiteID) %>%
+  summarize(sum_pptmm = sum(precipitation, na.rm = TRUE)*1000,
+            time_min = sum(rain_time),
+            n = n(),
+            .groups = "drop")
+
+runoff_sum <- runoff_event %>%
+  filter(!duplicated(cbind(Year, SiteID, eventStart))) %>%
+  group_by(Year, SiteID, Treatment) %>%
+  distinct() %>%
+  summarize(sum_flow = sum(flow),
+            time_min = sum(flow_time),
+            n = n(),
+            .groups = "drop")
+
+runoff_mean <- runoff_event %>%
+  filter(!duplicated(cbind(Year, SiteID, eventStart))) %>%
+  group_by(Year, SiteID, Treatment) %>%
+  distinct() %>%
+  summarize(sum_flow = sum(flow),
+            time_min = sum(flow_time),
+            n = n(),
+            .groups = "drop")
+
+```
+
+```{r wp_plot, dependson = "plot_data", eval = FALSE, echo = FALSE}
+g <- ggplot(full_df, 
+           aes(x = log(ppt_sum), y = log(tss_load+0.0016488035), group=Treatment, color=Treatment)) + 
+  geom_line() +
+  geom_point() +
+  facet_grid(SiteID + random ~ Year) + 
+  #scale_y_log10() + 
+  labs(title ="Total load (log(kg/ha)) by rainfall accumulation per sample event (log(m))") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+g
+
+#ggsave("fig/wp_plot.png", g)
+```
+
+
+
+```{r wp_per_day_plot, dependson = "plot_data"}
+g <- ggplot(load_sum, 
+           aes(x = Treatment, 
+               y = sum_load)) + 
+  geom_point() + 
+  geom_line() +
+  facet_grid(SiteID ~ Year, scales = "free_y") + 
+  #scale_y_log10() + 
+  labs(title ="Total load (kg/ha) per field season") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+g
+
+#ggsave("fig/wp_per_day_plot.png", g)
+```
+
+Average isn't realistic
+
+
+```{r strip_boxplot, dependson = "create_soilpad", eval = FALSE, echo = FALSE}
+g <- ggplot(flume, 
+           aes(x = Year, y = precipitation, color=crop)) + 
+  geom_boxplot() +
+  geom_point() + 
+  #geom_jitter() +
+  facet_grid( ~ SiteID) + 
+  #scale_y_log10() + 
+  theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5))
+g
+```
+
+#```{r, dependson="create_sediment"}
+#pivot_sample %>% 
+#  anova_test(ln_trt ~ ln_ppt*ln_ctl)
+## purr https://stackoverflow.com/questions/50702152/compare-models-via-anova-with-purrr-or-dplyr
+## anova() and may need an linear model built up.
+#```
+
+
+# Main Analyses
+
+There are three main analyses of interest:
+
+- confirmatory, design-based analysis
+- exploratory, covariate analysis
+- relationship of sediment flow to sediment loss
+
+## Confirmatory, design-based analysis
+
+### Treatment effect
+
+```{r design_model, dependson = "load"}
+mf_paper <- lme4::lmer(log(tss_load+0.0016) ~ 
+                         Treatment*ln_ppt +
+                         #Treatment*crop +
+                         Year*Treatment +
+                         #(1|SiteID) + #removed due to singular fit
+                         (1|SiteID:Treatment) + 
+                         (1|Year:sample_event) + #consider this and below with SiteID
+                         (1|SiteID:Year:sample_event), 
+                       REML=FALSE,
+                       data = full_df)
+
+summary(mf_paper)
+
+```
+
+# Check assumptions
+
+There are two possible models:
+
+- m_flume: full model design, design-based analysis
+- m_flume_model: model design selected based on backward step selection
+
+### Full model design
+
+```{r design_model_residual_plots, dependson = "design_model"}
+resid_panel(mf_paper, 
+            plots = c("resid","index","yvp","qq"),
+            smoother = TRUE, qqbands = TRUE)
+
+resid_xpanel(mf_paper)
+```
+
+## Plot of the effect sizes
+```{r design_model_contrasts, dependson = "design_model"}
+sjPlot::plot_model(mf_paper)
+
+```
+
+```{r diversion_figure, dependson="diversion_contrasts"}
+sjPlot::plot_model(mf_paper,
+                   show.values=TRUE, show.p=TRUE,
+                   title='Sediment transport predictor variables \n (RandomDataset)')
+```
+
+```{r diversion_figure, dependson="diversion_contrasts"}
+sjPlot::tab_model(mf_paper,
+                  show.re.var=TRUE,
+                  pred.labels = c("Intercept", "Control Treatment", "log(rainfall (mm))", "2017",
+                                  "2018", "2019", "2020", "2021", "Control*log(rainfall)", "Control*2017",
+                                  "Control*2018", "Control*2019",
+                                  "Control*2020", "Control*2021"),
+                  dv.labels = "Full Dataset")
+
+```
+
+```{r diversion_figure, dependson="diversion_contrasts"}
+effects_trt <- effects::effect(term= "Treatment", mod= mf_paper)
+summary(effects_trt) #output of what the values are
+```
+
+```{r diversion_figure, dependson="diversion_contrasts"}
+effects_ppt <- effects::effect(term= "ln_ppt", mod= mf_paper)
+summary(effects_trt) #output of what the values are
+
+x_ppt <- as.data.frame(effects_ppt)
+
+```
+
+
+```{r diversion_figure, dependson="diversion_contrasts"}
+urchin_plot <- ggplot() + 
+  #2
+geom_point(data=full_df, aes(ln_ppt, log(tss_load))) + 
+  #3
+  geom_point(data=x_ppt, aes(x=ln_ppt, y=fit), color="blue") +
+  #4
+  geom_line(data=x_ppt, aes(x=ln_ppt, y=fit), color="blue") +
+  #5
+  #geom_ribbon(data= x_ppt, aes(x=ln_ppt, ymin=lower, ymax=upper), alpha= 0.3, fill="blue") +
+  #6
+  labs(x="Urchins (centered & scaled)", y="Coral Cover")
+
+urchin_plot
+
+h <- ggplot(data = full_df, aes(y = log(tss_load), x = ln_ppt, fill = Treatment, color = Treatment)) + 
+    #geom_line(aes(group = Treatment), col = "black") +
+    geom_point(size = 3, position = position_dodge(width = 0.7), show.legend = FALSE) +
+  geom_smooth(method=lm, se=FALSE, fullrange=TRUE) +
+    facet_wrap(~ SiteID, nrow = 7) +
+    labs(x = "Treatment", y = "log phenolics concentration") +
+    theme(aspect.ratio = 2)+
+    theme_classic()
+
+h
+
+visreg(mf_paper, xvar = "ln_ppt", by = "Treatment", overlay = TRUE,
+      ylab="Log phenolics concentration", data = x)
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

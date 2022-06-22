@@ -1,0 +1,567 @@
+---
+title: "Flume: Full Analysis (March-November)"
+subtitle: "(adapted from Jarad Niemi - Soilpad Analysis)"
+author: "Jessica Nelson"
+date: "`r Sys.Date()`"
+output:
+  pdf_document:
+    toc: yes
+  html_document:
+    toc: yes
+---
+
+```{r setup}
+knitr::opts_chunk$set(echo = TRUE,
+                      cache = TRUE,
+                      fig.width = 12,
+                      fig.height = 12)
+
+library("lme4")
+library("lmerTest")
+library("tidyverse"); theme_set(theme_bw())
+library("lattice")
+library("emmeans")
+library("ggResidpanel")
+library("data.table")
+library("stringr")
+library("ggplot2")
+library("ggpmisc")
+library("performance")
+library("multcomp")
+library("xtable")
+
+
+options(width = 120, scipen = 999)
+windowsFonts(A = windowsFont("Times New Roman"))
+
+dir.create("fig", showWarnings = FALSE)
+```
+
+```{r}
+sessionInfo()
+```
+
+## Read in data
+
+```{r, child="sediment.Rmd"}
+```
+
+
+```{r load, dependson= "full_dataframe"}
+load("full_df.RData")
+
+#full_df <- read_csv("../data/tidy/full_df_in.csv") %>%
+#  mutate(Year = factor(Year),
+#         Treatment = factor(Treatment, levels=c('strips','control')))
+
+#load("full_df.RData")
+#full_df <- read_csv("../data/tidy/full_df_out.csv") %>%
+#  mutate(Year = factor(Year),
+#        Treatment = factor(Treatment, levels=c('strips','control')))
+  
+#load_weight_time$ln_ppt <- log((load_weight_time$precipitation+0.0004)*100)
+#load_weight_time$Year <- factor(load_weight_time$Year)
+
+##Statistical significance between treatments
+rusle <- read_csv("../data/scratch/rusle_calculations.csv") %>%
+    filter(Scenario == "current") %>%
+  filter(random == "R")
+
+control <- rusle$control
+strips <- rusle$strips
+
+rusle_st <- rusle %>%
+  filter(Scenario == "current") %>%
+  group_by(Treatment) %>%
+  summarise(
+    count = n(),
+    mean = mean(A, na.rm = TRUE),
+    sd = sd(A, na.rm = TRUE)
+  )
+
+res <- t.test(control, strips, paired=TRUE)
+res
+
+```
+
+## Exploratory analysis
+
+## Site-year with sample event
+
+```{r, dependson="load"}
+site_year_rfevent <- full_df %>%
+  dplyr::select(SiteID, Year, sample_event) %>%
+  unique()
+
+ggplot(site_year_rfevent, aes(Year, SiteID, fill=sample_event)) +
+  geom_tile()
+```
+
+## Data visualization
+
+## Number of samples
+
+Calculate the number of observations for each treatment-position-year-site-time
+combination. 
+
+```{r sample_event_counts, dependson="load"}
+TSS_counts <- full_df %>%
+  group_by(Year, SiteID, Treatment, crop, random) %>%
+  distinct() %>%
+  summarize(n = n(), .groups = "drop")
+```
+
+Plot the number of observations for each combination. 
+
+```{r plot_count, dependson="sample_event_counts", out.width = "\\textwidth"}
+g = ggplot(TSS_counts, aes(x = Treatment, y = crop, fill = n)) +
+  geom_tile() +
+  geom_text(aes(label = n), color = "white") +
+  facet_grid(SiteID + random ~ Year) +
+  scale_fill_gradient(low = "blue", high = "black") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+g 
+```
+
+
+```{r, dependson="load"}
+h <- ggplot(full_df, aes(x=log(rain), y=log(tss_sum+0.000359), color=Treatment), inherit.aes = FALSE) +
+ scale_color_manual(values = c("control" = "#C38820",
+                              "strips" = "#176D9C"),
+                  #labels=c( "Control", "Prairie Strip"),
+                    name  ="") +
+#h <- ggplot(full_df, aes(x=log(ppt_sum), y=log(tss_load+0.0016)), inherit.aes = FALSE) +
+ geom_point(size=5) +
+ xlab("log(Rainfall Total (mm))") +
+ ylab("log(TSS load (kg/ha))") +
+ geom_smooth(method=lm, se=FALSE, fullrange=TRUE, size=3) +
+ ggtitle("A. Full Dataset (Out)") +
+ theme(plot.title = element_text(family="A", size=28, face="bold", hjust=0.5),
+       axis.title.x = element_text(family="A", size=28, face="bold"),
+       axis.title.y = element_text(family="A", size=28, face="bold"),
+       axis.text.x = element_text(family="A", size=28),
+       axis.text.y = element_text(family="A", size=28),
+       legend.text = element_text(family = "A", size=28),
+       legend.key.size = unit(3,"line")) +
+ stat_poly_eq(formula = y ~ x,
+              aes(label = paste(..eq.label.., ..rr.label.., ..p.value.label.., sep = "*`,`~")),
+              parse = TRUE,
+              label.x.npc = "left",
+              label.y.npc = "top",
+              vstep = 0.05,
+              size = 8)
+
+h <- ggplot(full_df, aes(x=log(ppt_sum), y=log(tss_load+0.0016488035), color=Treatment), inherit.aes = FALSE) +
+  geom_point(aes(shape=Year)) + 
+  #scale_y_log10() +
+  geom_smooth(method=lm, se=TRUE, fullrange=TRUE) +
+  ggtitle("Log-log relationship between TSS load and rainfall accumulation \n(full dataset)") +
+  theme(plot.title = element_text(size=14, face="bold",hjust = 0.5))
+
+
+#ggsave("E:/ISU/Project/SoilMove/data/statistics/flume_analysis/code/fig/Reg_ppt_loadOUT.png", h, width = 12, height = 12)
+
+```
+
+```{r mean_data, dependson = "load"}
+load_sum <- full_df %>%
+  group_by(Year, SiteID, Treatment, crop) %>%
+  summarize(sum_load             = sum(tss_load, na.rm = TRUE),
+            log_load = mean(log(sum_load), na.rm = TRUE),
+            n                   = n(),
+            .groups = "drop")
+
+
+ppt_sum <- full_df %>%
+  group_by(Year, SiteID, Treatment) %>%
+  summarize(sum_ppt             = sum(ppt_sum, na.rm = TRUE)*1000,
+            #log_load = mean(log(sum_load), na.rm = TRUE),
+            n                   = n(),
+            .groups = "drop")
+
+TSS_sum <- full_df %>%
+  group_by(Year, SiteID, Treatment) %>%
+  distinct() %>%
+  summarize(tss_sum = sum(tss_load), .groups = "drop")
+
+```
+
+```{r wp_plot, dependson = "plot_data", eval = FALSE, echo = FALSE}
+g <- ggplot(full_df, 
+           aes(x = log(ppt_sum), y = log(tss_load+0.0016488035), group=Treatment, color=Treatment)) + 
+  geom_line() +
+  geom_point() +
+  facet_grid(SiteID + random ~ Year) + 
+  #scale_y_log10() + 
+  labs(title ="Total load (log(kg/ha)) by rainfall accumulation per sample event (log(m))") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+g
+
+#ggsave("fig/wp_plot.png", g)
+```
+
+
+
+```{r wp_per_day_plot, dependson = "plot_data"}
+g <- ggplot(load_sum, 
+           aes(x = Treatment, 
+               y = sum_load)) + 
+  geom_point() + 
+  geom_line() +
+  facet_grid(SiteID ~ Year, scales = "free_y") + 
+  #scale_y_log10() + 
+  labs(title ="Total load (kg/ha) per field season") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+g
+
+#ggsave("fig/wp_per_day_plot.png", g)
+```
+
+Average isn't realistic
+
+
+```{r strip_boxplot, dependson = "create_soilpad", eval = FALSE, echo = FALSE}
+g <- ggplot(flume, 
+           aes(x = Year, y = precipitation, color=crop)) + 
+  geom_boxplot() +
+  geom_point() + 
+  #geom_jitter() +
+  facet_grid( ~ SiteID) + 
+  #scale_y_log10() + 
+  theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5))
+g
+```
+
+#```{r, dependson="create_sediment"}
+#pivot_sample %>% 
+#  anova_test(ln_trt ~ ln_ppt*ln_ctl)
+## purr https://stackoverflow.com/questions/50702152/compare-models-via-anova-with-purrr-or-dplyr
+## anova() and may need an linear model built up.
+#```
+
+
+# Main Analyses
+
+There are three main analyses of interest:
+
+- confirmatory, design-based analysis
+- exploratory, covariate analysis
+- relationship of sediment flow to sediment loss
+
+## Confirmatory, design-based analysis
+
+### Treatment effect
+
+```{r design_model, dependson = "load"}
+
+m_flume <- lmerTest::lmer(log(tss_sum+0.000359) ~ 
+                             Treatment*ln_ppt +
+                            #Treatment*crop +
+                            Year*Treatment +
+                            
+                            #(1 | SiteID) + #removed due to singular fit
+                             (1 | SiteID:Treatment) + 
+                            (1|Year:sample_event) + #consider this and below with SiteID 
+                            (1|SiteID:Year:sample_event), 
+                          
+                          data = full_df)
+
+summary(m_flume)
+anova(m_flume)
+performance::r2(m_flume)
+confint(m_flume, oldNames = FALSE)
+anova(m_flume)
+r2_nakagawa(m_flume)
+icc(m_flume)
+
+#full_df$trt_lnppt <- interaction(full_df$Treatment, full_df$ln_ppt)
+#loadR <- load_weight_time %>%
+  #filter(!is.na(ro_event)) %>%
+#    subset(random == 'R')
+#m2_flume <- lmerTest::lmer(log(tss_sum+0.000359) ~ 
+#                            Treatment*ln_ppt +
+#                            Year*Treatment +
+#                            
+#                            #(1 | SiteID) + #removed due to singular fit
+#                             #(1 | SiteID:Treatment) + 
+#                            #(1|Year:Time) + #consider this and below with SiteID 
+#                            (1|SiteID:Year:Time), 
+#                          
+#                          data = loadR)
+
+#summary(m2_flume)
+#anova(m2_flume)
+#r2(m2_flume)
+#icc(m2_flume)
+#contr <- glht(m2_flume, linfct=mcp(trt_lnppt='Tukey'))
+#summary(contr, test=adjusted("Shaffer"))
+
+```
+
+```{r design_step_model, dependson = "design_model"}
+m_flume_step <- step(m_flume, reduce.random = FALSE, alpha.fixed = 0.1)
+m_flume_model <- get_model(m_flume_step)
+summary(m_flume_model)
+
+##https://campus.datacamp.com/courses/hierarchical-and-mixed-effects-models-in-r/linear-mixed-effect-models?ex=7
+```
+
+#```{r design_step_model, dependson = "design_model"}
+#emmip(m_flume, ln_ppt ~ Treatment | Year)
+
+##https://campus.datacamp.com/courses/hierarchical-and-mixed-effects-models-in-r/linear-mixed-effect-models?ex=7
+#```
+
+
+```{r design_model_contrasts, dependson = "design_model"}
+trt_yr = emmeans(m_flume, pairwise ~ Treatment|Year, 
+                    type = "response",
+                    lmer.df = "asymptotic") 
+confint(trt_yr)$contrasts
+
+trt = emmeans(m_flume, pairwise ~ Treatment, 
+                    type = "response", 
+                    lmer.df = "asymptotic")
+confint(trt)
+
+year = emmeans(m_flume, ~ Year, 
+                    type = "response",
+                    lmer.df = "asymptotic") 
+confint(year)
+
+##make this a function of what it is equal to (ln_ppt), could automate, but doing manual, ##uniroot()
+trt_ppt = emmeans(m_flume, pairwise ~ Treatment|ln_ppt,
+                    at=list(ln_ppt=c(-4,-3.5,-3.05,-3,-2)), 
+                    at=list(ln_ppt=c(-2.815)), 
+                    type = "response",
+                    lmer.df = "asymptotic")
+
+contrast(trt_ppt, "pairwise")
+confint(trt_ppt)$contrasts ## exp. the values
+
+trt_ppt2 = emmeans(m_flume, "Treatment",
+                   by='ln_ppt',
+                    at=list(ln_ppt=c(-2.815, -3, -2.45, -3.62)), 
+                    type = "response",
+                    lmer.df = "asymptotic")
+con = contrast(trt_ppt2, "pairwise", options= list(adjust = 'bonferroni'))
+summary(con)
+con
+#emtrends(m_flume, pairwise~Treatment, var="ln_ppt")
+#emmip(m_flume, Treatment~ln_ppt, cov.reduce = range)
+#testInteractions(m_flume, residual=c("Treatment", "crop"))
+
+#pred <- exp(predictInterval(m_flume, newdata = full_df, n.sims = 1000))
+
+```
+
+
+```{r mean_tss_figure, dependson="load"}
+# trt <- as.data.frame(trt)
+# 
+# k <- trt %>%
+#   filter(contrast != "strips - control")
+# 
+# trt_plot <- k %>%
+#   ggplot(aes(x=Treatment, y=response, fill=Treatment))+
+#   geom_bar(width = 0.5, position = position_dodge(), stat="summary") +
+#   geom_errorbar(aes(ymin = (response-SE), ymax = (response+SE)),
+#             width = 0.2,
+#             linetype = "solid",
+#             position = position_dodge(width = 0.5),
+#             color="black", size=0.7) +
+#   scale_fill_manual(values = c("control" = "#176D9C",
+#                                "strips" = "#C38820")) +
+#   ggtitle("Comparison of Total Suspended Sediment (TSS) loads \n (Full Dataset)") +
+#   xlab("Treatment") +
+#   ylab("TSS Load \n(kg/ha)") +
+#   theme(plot.title = element_text(size=20, face="bold", hjust=0.5),
+#         axis.title.x = element_text(size=18, face="bold"),
+#         axis.title.y = element_text(size=18, face="bold"),
+#         axis.text.x = element_text(size=18),
+#         axis.text.y = element_text(size=18)) +
+#   scale_x_discrete(labels= c("Control", "Prairie Strip"))
+# 
+# trt_plot
+
+group <- full_df %>% 
+  group_by(Treatment) %>% 
+  summarize(n = n(), 
+            mean = mean(tss_sum), 
+            sd = sd(tss_sum),
+            .groups = "drop") %>%
+  mutate(se = sd / sqrt(n),
+         lb = mean + qt(0.025, df = n-1)*se,
+         ub = mean - qt(0.025, df = n-1)*se)
+
+trt_plot <- group %>%
+  ggplot(aes(x=Treatment, y=mean, fill=Treatment))+
+  geom_bar(width = 0.5, position = position_dodge(), stat="summary") +
+  geom_errorbar(aes(ymin = (mean-se), ymax = (mean+se)),
+                width = 0.3,
+                linetype = "solid",
+                position = position_dodge(width = 0.5),
+                color="black", size=0.7) +
+  scale_fill_manual(values = c("control" = "#C38820",
+                              "strips" = "#176D9C")) +
+  ggtitle("A. Full Dataset") +
+  xlab("Treatment") +
+  ylab("TSS Load (kg/ha)") +
+ theme(plot.title = element_text(family="A", size=28, face="bold", hjust=0.5),
+       axis.title.x = element_text(family="A", size=28, face="bold"),
+       axis.title.y = element_text(family="A", size=28, face="bold"),
+       axis.text.x = element_text(family="A", size=28),
+       axis.text.y = element_text(family="A", size=28)) +
+  scale_x_discrete(labels= c("Prairie Strip", "Control"))+
+  scale_y_continuous(limits = c(0, 50))
+
+trt_plot
+#ggsave("E:/ISU/Project/SoilMove/data/statistics/flume_analysis/code/fig/flume_plot.png", trt_plot)
+```
+
+# Check assumptions
+
+There are two possible models:
+
+- m_flume: full model design, design-based analysis
+- m_flume_model: model design selected based on backward step selection
+
+### Full model design
+
+```{r design_model_residual_plots, dependson = "design_model"}
+resid_panel(m_flume, 
+            plots = c("resid","index","yvp","qq"),
+            smoother = TRUE, qqbands = TRUE)
+
+resid_xpanel(m_flume)
+```
+
+### Selected model design
+```{r design_step_residual_plots, dependson = "design_step_model"}
+resid_panel(m_flume_model, 
+            plots = c("resid","index","yvp","qq"),
+            smoother = TRUE, qqbands = TRUE)
+
+resid_xpanel(m_flume_model)
+```
+
+
+
+```{r extract-contrast-ci, dependson="design_model"}
+extract_contrast_ci <- function(d) {
+  m <- lmerTest::lmer(update(m_flume, 
+                          as.formula(paste0("~.+",d$variable))),
+                    data = full_df) 
+    
+  # Obtain coefficient for new variable
+  av <- anova(m)
+  rowid <- which(rownames(av) == d$variable)
+  
+   
+  em <- emmeans(m, 
+                pairwise ~ Treatment, 
+                type = "response", 
+                lmer.df = "asymptotic")
+  
+  cbind(
+    av[rowid,] %>% as.data.frame,
+    confint(em)$contrasts %>% as.data.frame
+  )
+}
+```
+
+
+```{r treatment-effect-with-explanatory-variables, dependson=c("extract-contrast-ci")}
+add <- data.frame(variable = c("slope75", "C_factor", "K_factor", "LSfactor", "Lfactor", "Sfactor", 
+               "post_Lupslp", "post_Tupslp", "ln_ppt", "pre_Lupslp"))
+
+added_variable_analyses <- add %>% 
+  group_by(variable) %>%
+  do(extract_contrast_ci(.))
+```
+
+
+```{r print-added-variable-analysis, dependson="treatment-effect-with-explanatory-variables", results='asis'}
+added_variable_analyses %>%
+  xtable() %>%
+  print(type="html", include.rownames=FALSE)
+```
+
+
+```{r caterpillar, eval = FALSE, echo = FALSE}
+
+ggCaterpillar <- function(re, QQ=TRUE, likeDotplot=TRUE, reorder=TRUE) {
+  require(ggplot2)
+  f <- function(x) {
+    pv   <- attr(x, "postVar")
+    cols <- 1:(dim(pv)[1])
+    se   <- unlist(lapply(cols, function(i) sqrt(pv[i, i, ])))
+    if (reorder) {
+      ord  <- unlist(lapply(x, order)) + rep((0:(ncol(x) - 1)) * nrow(x), each=nrow(x))
+      pDf  <- data.frame(y=unlist(x)[ord],
+                         ci=1.96*se[ord],
+                         nQQ=rep(qnorm(ppoints(nrow(x))), ncol(x)),
+                         ID=factor(rep(rownames(x), ncol(x))[ord], levels=rownames(x)[ord]),
+                         ind=gl(ncol(x), nrow(x), labels=names(x)))
+    } else {
+      pDf  <- data.frame(y=unlist(x),
+                         ci=1.96*se,
+                         nQQ=rep(qnorm(ppoints(nrow(x))), ncol(x)),
+                         ID=factor(rep(rownames(x), ncol(x)), levels=rownames(x)),
+                         ind=gl(ncol(x), nrow(x), labels=names(x)))
+    }
+
+    if(QQ) {  ## normal QQ-plot
+      p <- ggplot(pDf, aes(nQQ, y))
+      p <- p + facet_wrap(~ ind, scales="free")
+      p <- p + xlab("Standard normal quantiles") + ylab("Random effect quantiles")
+    } else {  ## caterpillar dotplot
+      p <- ggplot(pDf, aes(ID, y)) + coord_flip()
+      if(likeDotplot) {  ## imitate dotplot() -> same scales for random effects
+        p <- p + facet_wrap(~ ind)
+      } else {           ## different scales for random effects
+        p <- p + facet_grid(ind ~ ., scales="free_y")
+      }
+      p <- p + xlab("Levels") + ylab("Random effects")
+    }
+
+    p <- p + theme(legend.position="none")
+    p <- p + geom_hline(yintercept=0)
+    p <- p + geom_errorbar(aes(ymin=y-ci, ymax=y+ci), width=0, colour="black")
+    p <- p + geom_point(aes(size=1.2), colour="blue") 
+    return(p)
+  }
+
+  lapply(re, f)
+}
+```
+
+```{r ranef, dependson = "design_model", eval = FALSE, echo = FALSE}
+ranef(m_flume)
+str(rr1 <- ranef(m_flume))
+
+str(dd <- as.data.frame(rr1))
+effects <- dd %>% 
+  separate(grp, c('SiteID', 'Year', 'sample_event'))
+
+dotplot(rr1, scales=list(x=list(relation='free')))[['SiteID:Year:sample_event']]
+ggCaterpillar(ranef(m_flume,condVar=TRUE), QQ=TRUE, likeDotplot= TRUE, reorder=TRUE)[['SiteID:Year:sample_event']]
+
+qqmath(rr1)
+
+```
+
+
+```{r ranef_plot, dependson = "ranef", eval = FALSE, echo = FALSE}
+g <- ggplot(effects %>% filter(grpvar=='SiteID:Year:sample_event'), 
+           aes(x = sample_event, y = condval)) + 
+  #geom_line() +
+  geom_point() +
+  facet_grid(SiteID ~ Year) + 
+  #scale_y_log10() + 
+  labs(title ="Total load (log(kg/ha)) by sample event") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+g
+
+```

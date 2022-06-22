@@ -1,0 +1,192 @@
+---
+title: "Flume: Full Analysis (March-November)"
+subtitle: "(adapted from Jarad Niemi - Soilpad Analysis)"
+author: "Jessica Nelson"
+date: "`r Sys.Date()`"
+output:
+  pdf_document:
+    toc: yes
+  html_document:
+    toc: yes
+---
+
+```{r setup}
+knitr::opts_chunk$set(echo = TRUE,
+                      cache = TRUE,
+                      fig.width = 12,
+                      fig.height = 12)
+
+library("tidyverse"); theme_set(theme_bw())
+library("data.table")
+library("stringr")
+
+
+options(width = 120, scipen = 999)
+windowsFonts(A = windowsFont("Times New Roman")) 
+
+dir.create("fig", showWarnings = FALSE)
+```
+
+```{r}
+sessionInfo()
+```
+
+## Read in data
+
+```{r load}
+##Statistical significance between treatments
+random <- read_csv("../data/scratch/rusle_calculations.csv") %>%
+    filter(Scenario == "current") %>%
+  filter(random == "R")
+
+full <- read_csv("../data/scratch/rusle_calculations.csv") %>%
+    filter(Scenario == "current")
+
+pre <- read_csv("../data/scratch/rusle_calculations.csv") %>%
+    filter(Scenario == "pre-prairie")
+
+```
+
+```{r ttest, dependson= "load"}
+statR <- t.test(random$control, random$strips, paired=TRUE)
+statR
+
+statF <- t.test(full$control, full$strips, paired=TRUE)
+statF
+
+statP <- t.test(pre$control, pre$strips, paired=TRUE)
+statP
+```
+
+
+```{r random_mean, dependson= "load"}
+rand_gat <- random %>%
+  gather(key="Treatment", value="A", "control":"strips")
+
+rand_mean <- rand_gat %>% 
+  group_by(Treatment) %>% 
+  summarize(n = n(), 
+            mean = mean(A), 
+            sd = sd(A),
+            .groups = "drop") %>%
+  mutate(se = sd / sqrt(n),
+         lb = mean + qt(0.025, df = n-1)*se,
+         ub = mean - qt(0.025, df = n-1)*se)
+
+```
+
+
+```{r random_plot, dependson= "random_mean"}
+rand_plot <- rand_mean %>%
+  ggplot(aes(x=Treatment, y=mean, fill=Treatment))+
+  geom_bar(width = 0.5, position = position_dodge(), stat="summary") +
+  geom_errorbar(aes(ymin = (mean-se), ymax = (mean+se)),
+                width = 0.3,
+                linetype = "solid",
+                position = position_dodge(width = 0.5),
+                color="black", size=0.7) +
+  scale_fill_manual(values = c("control" = "#C38820",
+                              "strips" = "#176D9C")) +
+  ggtitle("B. Randomized Location Subset") +
+  xlab("Treatment") +
+  ylab("Annual Soil Loss (lbs/ac)") +
+ theme(plot.title = element_text(family="A", size=28, face="bold", hjust=0.5),
+       axis.title.x = element_text(family="A", size=28, face="bold"),
+       axis.title.y = element_text(family="A", size=28, face="bold"),
+       axis.text.x = element_text(family="A", size=28),
+       axis.text.y = element_text(family="A", size=28)) +
+  scale_x_discrete(labels= c("Control", "Prairie Strip")) +
+  scale_y_continuous(limits = c(0, 20))
+
+rand_plot
+
+```
+
+
+```{r full_mean, dependson= "load"}
+full_gat <- full %>%
+  gather(key="Treatment", value="A", "control":"strips")
+
+full_mean <- full_gat %>% 
+  group_by(Treatment) %>% 
+  summarize(n = n(), 
+            mean = mean(A), 
+            sd = sd(A),
+            .groups = "drop") %>%
+  mutate(se = sd / sqrt(n),
+         lb = mean + qt(0.025, df = n-1)*se,
+         ub = mean - qt(0.025, df = n-1)*se)
+
+```
+
+```{r full_plot, dependson= "full_mean"}
+full_plot <- full_mean %>%
+  ggplot(aes(x=Treatment, y=mean, fill=Treatment))+
+  geom_bar(width = 0.5, position = position_dodge(), stat="summary") +
+  geom_errorbar(aes(ymin = (mean-se), ymax = (mean+se)),
+                width = 0.3,
+                linetype = "solid",
+                position = position_dodge(width = 0.5),
+                color="black", size=0.7) +
+  scale_fill_manual(values = c("control" = "#C38820",
+                              "strips" = "#176D9C")) +
+  ggtitle("A. Full Dataset") +
+  xlab("Treatment") +
+  ylab("Annual Soil Loss (lbs/ac)") +
+ theme(plot.title = element_text(family="A", size=28, face="bold", hjust=0.5),
+       axis.title.x = element_text(family="A", size=28, face="bold"),
+       axis.title.y = element_text(family="A", size=28, face="bold"),
+       axis.text.x = element_text(family="A", size=28),
+       axis.text.y = element_text(family="A", size=28)) +
+  scale_x_discrete(labels= c("Control", "Prairie Strip")) +
+  scale_y_continuous(limits = c(0, 20))
+
+full_plot
+
+```
+
+
+```{r pre_mean, dependson= "loan"}
+pre_gat <- pre %>%
+  gather(key="Treatment", value="A", "control":"strips")
+
+pre_mean <- pre_gat %>% 
+  group_by(Treatment) %>% 
+  summarize(n = n(), 
+            mean = mean(A), 
+            sd = sd(A),
+            .groups = "drop") %>%
+  mutate(se = sd / sqrt(n),
+         lb = mean + qt(0.025, df = n-1)*se,
+         ub = mean - qt(0.025, df = n-1)*se)
+
+```
+
+
+```{r pre_plot, dependson= "pre_mean"}
+pre_plot <- pre_mean %>%
+  ggplot(aes(x=Treatment, y=mean, fill=Treatment))+
+  geom_bar(width = 0.5, position = position_dodge(), stat="summary") +
+  geom_errorbar(aes(ymin = (mean-se), ymax = (mean+se)),
+                width = 0.3,
+                linetype = "solid",
+                position = position_dodge(width = 0.5),
+                color="black", size=0.7) +
+  scale_fill_manual(values = c("control" = "#C38820",
+                              "strips" = "#176D9C")) +
+  ggtitle("C. Full Dataset: Pre-Prairie") +
+  xlab("Treatment") +
+  ylab("Annual Soil Loss (lbs/ac)") +
+ theme(plot.title = element_text(family="A", size=28, face="bold", hjust=0.5),
+       axis.title.x = element_text(family="A", size=28, face="bold"),
+       axis.title.y = element_text(family="A", size=28, face="bold"),
+       axis.text.x = element_text(family="A", size=28),
+       axis.text.y = element_text(family="A", size=28)) +
+  scale_x_discrete(labels= c("Control", "Prairie Strip")) +
+  scale_y_continuous(limits = c(0, 20))
+
+pre_plot
+
+```
+
+  
