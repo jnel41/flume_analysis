@@ -77,8 +77,8 @@ rf_flags <- event %>%
   #  mutate(eventflag = ifelse(row_number() < 72 & rainflag == 0, 0, eventflag)) %>%
   #  mutate(eventid = rep(seq(1,length(rle(eventflag)$lengths)), rle(eventflag)$lengths)) 
   mutate(eventflag = ifelse(rainflag == 1,1, 
-                            ifelse(rainflag == 0 & rainlength < 72, 1,0))) %>% #72 entries or at least 6 hours (Virginia) of dry between wet events
-  mutate(eventflag = ifelse(row_number() < 72 & rainflag == 0, 0, eventflag)) %>%
+                            ifelse(rainflag == 0 & rainlength < 144, 1,0))) %>% #72 entries or at least 12 hours (Virginia) of dry between wet events
+  mutate(eventflag = ifelse(row_number() < 144 & rainflag == 0, 0, eventflag)) %>%
   mutate(eventid = rep(seq(1,length(rle(eventflag)$lengths)), rle(eventflag)$lengths)) 
 
 rain_pivot <- rf_flags %>% 
@@ -199,6 +199,6 @@ rfro_joined <- ro_cumulative %>%
   select(SiteID, Year, Treatment, sampleID, tss_sum, flow_sum, flow_min, 
          ro_count, rf_count, rain, rain_min)
 
-write.csv(rfro_joined, "./data/tidy/rf6ro12event_UPDATE.csv",  row.names = FALSE)
+write.csv(rfro_joined, "./data/tidy/rf12ro12event_UPDATE.csv",  row.names = FALSE)
   
   

@@ -83,7 +83,7 @@ res
 
 ```{r, dependson="load"}
 site_year_rfevent <- full_df %>%
-  select(SiteID, Year, sample_event) %>%
+  dplyr::select(SiteID, Year, sample_event) %>%
   unique()
 
 ggplot(site_year_rfevent, aes(Year, SiteID, fill=sample_event)) +
@@ -145,7 +145,7 @@ g
 # ```
 
 ```{r, dependson="load"}
-h <- ggplot(full_df, aes(x=log(ppt_sum), y=log(tss_load+0.0016), color=Treatment), inherit.aes = FALSE) +
+h <- ggplot(full_df, aes(x=log(rain), y=log(tss_sum+0.000359), color=Treatment), inherit.aes = FALSE) +
  scale_color_manual(values = c("control" = "#C38820",
                               "strips" = "#176D9C"),
                   #labels=c( "Control", "Prairie Strip"),
@@ -173,7 +173,7 @@ h <- ggplot(full_df, aes(x=log(ppt_sum), y=log(tss_load+0.0016), color=Treatment
 
 h
 
-ggsave("E:/ISU/Project/SoilMove/data/statistics/flume_analysis/code/fig/Reg_ppt_loadOUT.png", h, width = 12, height = 12)
+#ggsave("E:/ISU/Project/SoilMove/data/statistics/flume_analysis/code/fig/Reg_ppt_loadOUT.png", h, width = 12, height = 12)
 
 ```
 
@@ -267,43 +267,43 @@ There are three main analyses of interest:
 ### Treatment effect
 
 ```{r design_model, dependson = "load"}
-#m_flume <- lmerTest::lmer(log(tss_load+0.0016) ~ 
-#                             Treatment*ln_ppt +
-#                            #Treatment*crop +
-#                            Year*Treatment +
-                            
-                            #(1 | SiteID) + #removed due to singular fit
-#                             (1 | SiteID:Treatment) + 
-#                            (1|Year:sample_event) + #consider this and below with SiteID 
-#                            (1|SiteID:Year:sample_event), 
-#                          
-#                          data = full_df)
-
-#summary(m_flume)
-#confint(m_flume, oldNames = FALSE)
-#anova(m_flume)
-#r2_nakagawa(m_flume)
-#icc(m_flume)
-
-#full_df$trt_lnppt <- interaction(full_df$Treatment, full_df$ln_ppt)
-loadR <- load_weight_time %>%
-  #filter(!is.na(ro_event)) %>%
-    subset(random == 'R')
-m2_flume <- lmerTest::lmer(log(tss_sum+0.0016) ~ 
-                            Treatment*ln_ppt +
+m_flume <- lmerTest::lmer(log(tss_sum+0.000359) ~ 
+                             Treatment*ln_ppt +
+                            #Treatment*crop +
                             Year*Treatment +
                             
                             #(1 | SiteID) + #removed due to singular fit
-                             #(1 | SiteID:Treatment) + 
-                            #(1|Year:Time) + #consider this and below with SiteID 
-                            (1|SiteID:Year:Time), 
+                             (1 | SiteID:Treatment) + 
+                            (1|Year:sample_event) + #consider this and below with SiteID 
+                            (1|SiteID:Year:sample_event), 
                           
-                          data = loadR)
+                          data = full_df)
 
-summary(m2_flume)
-anova(m2_flume)
-r2(m2_flume)
-icc(m2_flume)
+summary(m_flume)
+confint(m_flume, oldNames = FALSE)
+anova(m_flume)
+r2_nakagawa(m_flume)
+icc(m_flume)
+
+#full_df$trt_lnppt <- interaction(full_df$Treatment, full_df$ln_ppt)
+#loadR <- load_weight_time %>%
+  #filter(!is.na(ro_event)) %>%
+#    subset(random == 'R')
+#m2_flume <- lmerTest::lmer(log(tss_sum+0.000359) ~ 
+#                            Treatment*ln_ppt +
+#                            Year*Treatment +
+#                            
+#                            #(1 | SiteID) + #removed due to singular fit
+#                             #(1 | SiteID:Treatment) + 
+#                            #(1|Year:Time) + #consider this and below with SiteID 
+#                            (1|SiteID:Year:Time), 
+#                          
+#                          data = loadR)
+
+#summary(m2_flume)
+#anova(m2_flume)
+#r2(m2_flume)
+#icc(m2_flume)
 #contr <- glht(m2_flume, linfct=mcp(trt_lnppt='Tukey'))
 #summary(contr, test=adjusted("Shaffer"))
 
@@ -406,8 +406,8 @@ confint(crop)$contrasts
 group <- full_df %>% 
   group_by(Treatment) %>% 
   summarize(n = n(), 
-            mean = mean(tss_load), 
-            sd = sd(tss_load),
+            mean = mean(tss_sum), 
+            sd = sd(tss_sum),
             .groups = "drop") %>%
   mutate(se = sd / sqrt(n),
          lb = mean + qt(0.025, df = n-1)*se,
@@ -435,7 +435,7 @@ trt_plot <- group %>%
   scale_y_continuous(limits = c(0, 50))
 
 trt_plot
-ggsave("E:/ISU/Project/SoilMove/data/statistics/flume_analysis/code/fig/flume_plot.png", trt_plot)
+#ggsave("E:/ISU/Project/SoilMove/data/statistics/flume_analysis/code/fig/flume_plot.png", trt_plot)
 ```
 
 # Check assumptions

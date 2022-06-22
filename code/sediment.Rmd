@@ -13,7 +13,7 @@ library("tidyverse")
 
 options(scipen = 999)
 
-flume <- read_csv("../data/tidy/flume_event_data612_UPDATE.csv") %>%
+flume <- read_csv("../data/tidy/rf12ro12event_UPDATEmanual.csv") %>%
   mutate(Year = factor(Year)) %>%
   subset(SiteID != 'MAR') %>%
   subset(subset=!(SiteID=="MCN" & Year == 2016)) %>%
@@ -23,7 +23,7 @@ flume <- read_csv("../data/tidy/flume_event_data612_UPDATE.csv") %>%
   subset(subset=!(SiteID=="MCN" & Year == 2020)) %>%
   subset(subset=!(SiteID=="RHO" & Year == 2016)) %>%
   subset(subset=!(SiteID=="RHO" & Year == 2017)) %>%
-  subset(subset=!(SiteID == "WOR" & Year == 2018 & precipitation == "NA"))
+  subset(subset=!(SiteID == "WOR" & Year == 2018 & rain == "NA"))
 
 ```
 
@@ -90,19 +90,20 @@ long_load <- long_load %>%
 ```
 
 ```{r full_dataframe, dependson = "random coding"}
-full_df <- rf_ro_pivot %>%
-  inner_join(ppt_sum,by=c("SiteID", "Year", "sample_event","crop")) %>%
-  drop_na(tss_load) %>%
-  mutate(ppt_sum = ppt_sum.x,
-         ln_ppt = log(ppt_sum.x),
-         Treatment = factor(Treatment.x, levels=c('strips','control')),
+#full_df <- rf_ro_pivot %>%
+full_df <- flume %>%
+  #inner_join(ppt_sum,by=c("SiteID", "Year", "sample_event","crop")) %>%
+  drop_na(tss_sum) %>%
+  mutate(#ppt_sum = ppt_sum.x,
+         ln_ppt = log(rain),
+         Treatment = factor(Treatment, levels=c('strips','control')),
          ln_slp = log(slope75),
          ln_LS = log(LSfactor),
          ln_L = log(Lfactor),
          ln_S = log(Sfactor),
          ln_postL = log(post_Lupslp),
          ln_postT = log(post_Tupslp)) %>%
-  subset(select = -c(Treatment.y, Treatment.x, ppt_sum.x, ppt_sum.y)) %>%
+  #subset(select = -c(Treatment.y, Treatment.x, ppt_sum.x, ppt_sum.y)) %>%
   arrange(Year, SiteID, Treatment, sample_event)
 
 save(full_df, file = "full_df.RData")
