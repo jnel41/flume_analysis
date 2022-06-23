@@ -32,7 +32,7 @@ library("xtable")
 
 
 options(width = 120, scipen = 999)
-windowsFonts(A = windowsFont("Times New Roman")) 
+windowsFonts(A = windowsFont("Times New Roman"))
 
 dir.create("fig", showWarnings = FALSE)
 ```
@@ -48,10 +48,16 @@ sessionInfo()
 
 
 ```{r load, dependson= "full_dataframe"}
+load("full_df.RData")
+
+#full_df <- read_csv("../data/tidy/full_df_in.csv") %>%
+#  mutate(Year = factor(Year),
+#         Treatment = factor(Treatment, levels=c('strips','control')))
+
 #load("full_df.RData")
-full_df <- read_csv("../data/tidy/full_df_out.csv") %>%
-  mutate(Year = factor(Year),
-         Treatment = factor(Treatment, levels=c('strips','control')))
+#full_df <- read_csv("../data/tidy/full_df_out.csv") %>%
+#  mutate(Year = factor(Year),
+#        Treatment = factor(Treatment, levels=c('strips','control')))
   
 #load_weight_time$ln_ppt <- log((load_weight_time$precipitation+0.0004)*100)
 #load_weight_time$Year <- factor(load_weight_time$Year)
@@ -75,6 +81,7 @@ rusle_st <- rusle %>%
 
 res <- t.test(control, strips, paired=TRUE)
 res
+
 ```
 
 ## Exploratory analysis
@@ -116,33 +123,7 @@ g = ggplot(TSS_counts, aes(x = Treatment, y = crop, fill = n)) +
 
 g 
 ```
-# ```{r, dependson="load"}
-# 
-# h <- ggplot(full_df, aes(x=log(ppt_sum), y=log(tss_load+0.0016488035), color=Treatment)) +
-#   labs(x="Day of year",y="Totall number of cells")+
-#   geom_point(shape = 16, size=3) +
-#   geom_abline(aes(intercept=`(Intercept)`, slope=ln_ppt), as.data.frame(t(fixef(m_flume)))) +
-#   #scale_y_log10() +
-#   scale_color_manual(values = c("control" = "#176D9C",
-#                                "strips" = "#C38820")) +
-#   xlab("log(rainfall total)") +
-#   ylab("log(TSS Load (kg/ha))") +
-#   #geom_smooth(method=lm, se=TRUE, fullrange=TRUE) +
-#   ggtitle("Log-log relationship between TSS load and rainfall accumulation \n(full dataset)") +
-#   theme(plot.title = element_text(size=14, face="bold",hjust = 0.5),
-#         legend.key.size = unit(3,"line")) +
-#   theme(plot.title = element_text(size=20, face="bold", hjust=0.5),
-#         axis.title.x = element_text(size=18, face="bold"),
-#         axis.title.y = element_text(size=18, face="bold"),
-#         axis.text.x = element_text(size=18),
-#         axis.text.y = element_text(size=18)) +
-#   xlim(-5, -1)
-#   
-# h
-# 
-# #ggsave("fig/randReg_ppt_load1trend.png", h, width = 12, height = 12)
-# 
-# ```
+
 
 ```{r, dependson="load"}
 h <- ggplot(full_df, aes(x=log(rain), y=log(tss_sum+0.000359), color=Treatment), inherit.aes = FALSE) +
@@ -171,7 +152,13 @@ h <- ggplot(full_df, aes(x=log(rain), y=log(tss_sum+0.000359), color=Treatment),
               vstep = 0.05,
               size = 8)
 
-h
+h <- ggplot(full_df, aes(x=log(ppt_sum), y=log(tss_load+0.0016488035), color=Treatment), inherit.aes = FALSE) +
+  geom_point(aes(shape=Year)) + 
+  #scale_y_log10() +
+  geom_smooth(method=lm, se=TRUE, fullrange=TRUE) +
+  ggtitle("Log-log relationship between TSS load and rainfall accumulation \n(full dataset)") +
+  theme(plot.title = element_text(size=14, face="bold",hjust = 0.5))
+
 
 #ggsave("E:/ISU/Project/SoilMove/data/statistics/flume_analysis/code/fig/Reg_ppt_loadOUT.png", h, width = 12, height = 12)
 
@@ -267,6 +254,7 @@ There are three main analyses of interest:
 ### Treatment effect
 
 ```{r design_model, dependson = "load"}
+
 m_flume <- lmerTest::lmer(log(tss_sum+0.000359) ~ 
                              Treatment*ln_ppt +
                             #Treatment*crop +
@@ -280,6 +268,8 @@ m_flume <- lmerTest::lmer(log(tss_sum+0.000359) ~
                           data = full_df)
 
 summary(m_flume)
+anova(m_flume)
+performance::r2(m_flume)
 confint(m_flume, oldNames = FALSE)
 anova(m_flume)
 r2_nakagawa(m_flume)
@@ -342,6 +332,7 @@ confint(year)
 
 ##make this a function of what it is equal to (ln_ppt), could automate, but doing manual, ##uniroot()
 trt_ppt = emmeans(m_flume, pairwise ~ Treatment|ln_ppt,
+                    at=list(ln_ppt=c(-4,-3.5,-3.05,-3,-2)), 
                     at=list(ln_ppt=c(-2.815)), 
                     type = "response",
                     lmer.df = "asymptotic")
@@ -361,19 +352,10 @@ con
 #emmip(m_flume, Treatment~ln_ppt, cov.reduce = range)
 #testInteractions(m_flume, residual=c("Treatment", "crop"))
 
-
-
-#plot(pairs(emmeans(m_flume, 'Treatment', 'crop'), adjust="jessica")) + 
-#  theme_bw(base_size=18) + 
-#  geom_vline(xintercept=0, size=2, color="red")
-
-crop      = emmeans(m_flume, pairwise ~ Treatment|crop,   
-                    type = "response",
-                    lmer.df = "asymptotic")
-
-confint(crop)$contrasts
+#pred <- exp(predictInterval(m_flume, newdata = full_df, n.sims = 1000))
 
 ```
+
 
 ```{r mean_tss_figure, dependson="load"}
 # trt <- as.data.frame(trt)

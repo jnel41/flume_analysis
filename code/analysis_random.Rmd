@@ -115,7 +115,11 @@ There are three main analyses of interest:
 
 
 ```{r designR_model, dependson = "flume_random"}
+<<<<<<< HEAD:code/scratch/analysis_random.Rmd
+mR_flume <- lmerTest::lmer(log(tss_load+0.025) ~ 
+=======
 mR_flume <- lmerTest::lmer(log(tss_load+0.0016) ~ 
+>>>>>>> 5543c56bb2da09fcc288c860826e8d700e90a5d1:code/analysis_random.Rmd
                              Treatment*ln_ppt +
                             #Treatment*crop +
                             Year*Treatment +
@@ -124,20 +128,32 @@ mR_flume <- lmerTest::lmer(log(tss_load+0.0016) ~
                              #Treatment*Sfactor +
                              #Treatment*slope75 +
                             
+<<<<<<< HEAD:code/scratch/analysis_random.Rmd
+                            (1 | SiteID) + 
+                             #(1 | SiteID:Treatment) + #removed due to singular fit
+                            (1|Year:sample_event),# + #removed due to singular fit
+                            #(1|SiteID:Year:sample_event), 
+=======
                             #(1 | SiteID) + #removed due to singular fit
                              (1 | SiteID:Treatment) + 
                             #(1|Year:sample_event) + #removed due to singular fit
                             (1|SiteID:Year:sample_event), 
+>>>>>>> 5543c56bb2da09fcc288c860826e8d700e90a5d1:code/analysis_random.Rmd
                            
                           data = flumeR)
 
 
 summary(mR_flume)
+<<<<<<< HEAD:code/scratch/analysis_random.Rmd
+anova(mR_flume)
+performance::r2(mR_flume)
+=======
 #confint(mR_flume, oldNames = FALSE)
 anova(mR_flume)
 r2_nakagawa(mR_flume)
 icc(mR_flume)
 
+>>>>>>> 5543c56bb2da09fcc288c860826e8d700e90a5d1:code/analysis_random.Rmd
 ```
 
 ```{r designR_step_model, dependson = "designR_model"}
