@@ -70,7 +70,8 @@ long_load <- pivot_sample %>%
 
 
 ```{r random coding, dependson = "pivot tables"}
-rf_ro_pivot <- long_load %>%
+#rf_ro_pivot <- long_load %>%
+rf_ro_pivot <- flume %>%
   mutate(random = (ifelse(SiteID == 'ARM', 'NR',
   ifelse(SiteID == 'EIA', 'R',
   ifelse(SiteID == 'MCN', 'R', 
@@ -90,8 +91,7 @@ long_load <- long_load %>%
 ```
 
 ```{r full_dataframe, dependson = "random coding"}
-#full_df <- rf_ro_pivot %>%
-full_df <- flume %>%
+full_df <- rf_ro_pivot %>%
   #inner_join(ppt_sum,by=c("SiteID", "Year", "sample_event","crop")) %>%
   drop_na(tss_sum) %>%
   mutate(#ppt_sum = ppt_sum.x,
