@@ -57,7 +57,7 @@ load <- df2 %>%
                             .default= 'control'),
          area_ha = acres*0.404686) %>%
   ungroup() %>%
-  select('SiteID','Treatment','date_time', 'Year','sampleID', 'tss_kg_ha', 'area_ha')
+  dplyr::select('SiteID','Treatment','date_time', 'Year','sampleID', 'tss_kg_ha', 'area_ha')
 
 load_cumulative <- load %>%
   group_by(Year, SiteID, Treatment, sampleID) %>% 
@@ -73,21 +73,21 @@ rf_flags <- event %>%
   mutate(rainflag = ifelse(rain > 0,1,0)) %>%
   mutate(rainlength = rep(rle(rainflag)$lengths, rle(rainflag)$lengths)) %>%
   #mutate(eventflag = ifelse(rainflag == 1,1, 
+  #                          ifelse(rainflag == 0 & rainlength < 288, 1,0))) %>% #288 entries or at least 24 hours (Levia and Herwitz 2002) of dry between wet events
+  #mutate(eventflag = ifelse(row_number() < 288 & rainflag == 0, 0, eventflag)) %>%
+  #mutate(eventid = rep(seq(1,length(rle(eventflag)$lengths)), rle(eventflag)$lengths)) 
+#mutate(eventflag = ifelse(rainflag == 1,1, 
   #                          ifelse(rainflag == 0 & rainlength < 36, 1,0))) %>% #3 entries or at least 3 hours (Dunkerly 2008) of dry between wet events
   #mutate(eventflag = ifelse(row_number() < 36 & rainflag == 0, 0, eventflag)) %>%
   #mutate(eventid = rep(seq(1,length(rle(eventflag)$lengths)), rle(eventflag)$lengths))
-  #mutate(eventflag = ifelse(rainflag == 1,1, 
-  #      ifelse(rainflag == 0 & rainlength < 72, 1,0))) %>% #72 entries or at least 6 hours (Osterholz et al. 2021) of dry between wet events
-  #mutate(eventflag = ifelse(row_number() < 72 & rainflag == 0, 0, eventflag)) %>%
-  #mutate(eventid = rep(seq(1,length(rle(eventflag)$lengths)), rle(eventflag)$lengths)) 
+  mutate(eventflag = ifelse(rainflag == 1,1, 
+        ifelse(rainflag == 0 & rainlength < 72, 1,0))) %>% #72 entries or at least 6 hours (Osterholz et al. 2021) of dry between wet events
+  mutate(eventflag = ifelse(row_number() < 72 & rainflag == 0, 0, eventflag)) %>%
+  mutate(eventid = rep(seq(1,length(rle(eventflag)$lengths)), rle(eventflag)$lengths)) 
   #mutate(eventflag = ifelse(rainflag == 1,1, 
   #                          ifelse(rainflag == 0 & rainlength < 144, 1,0))) %>% #144 entries or at least 12 hours (Virginia 2018; Bracken 2008) of dry between wet events
   #mutate(eventflag = ifelse(row_number() < 144 & rainflag == 0, 0, eventflag)) %>%
   #mutate(eventid = rep(seq(1,length(rle(eventflag)$lengths)), rle(eventflag)$lengths)) 
-  mutate(eventflag = ifelse(rainflag == 1,1, 
-                            ifelse(rainflag == 0 & rainlength < 288, 1,0))) %>% #288 entries or at least 24 hours (Levia and Herwitz 2002) of dry between wet events
-  mutate(eventflag = ifelse(row_number() < 288 & rainflag == 0, 0, eventflag)) %>%
-  mutate(eventid = rep(seq(1,length(rle(eventflag)$lengths)), rle(eventflag)$lengths)) 
   
 rain_pivot <- rf_flags %>% 
   # Select only the rain events
@@ -114,7 +114,7 @@ rain_unique <- rain_pivot %>%
   dplyr::select(Year, SiteID, precipitation, eventStart, eventEnd, rain_time) %>%
   distinct()
 
-#rain_event <- rain_unique[rain_unique$precipitation > 0.00635, ] #>6.35 mm of rain (Osterholz et al. 2021)
+rain_event <- rain_unique[rain_unique$precipitation > 0.00635, ] #>6.35 mm of rain (Osterholz et al. 2021)
 rain_event <- rain_unique # no minimum amount (Virginia 2018)
 rain_event <- rain_unique[rain_unique$precipitation > 0.00254, ] # >0.254 mm of rain (Levia and Herwitz 2002; unspecified amount Levia 2004)
 
@@ -144,7 +144,7 @@ rf_joined <- rf_newtimes %>%
   #mutate(rf_event = eventid,
   #       Year = Year.x) %>%
   drop_na(sampleID) %>%
-  select(Year, SiteID, date_time, rf_event, rain_mm, rain_hr, rf_rate, sampleID)
+  dplyr::select(Year, SiteID, date_time, rf_event, rain_mm, rain_hr, rf_rate, sampleID)
 
 rf_cumulative <- rf_joined %>%
   distinct(Year, SiteID, rf_event, sampleID, rain_mm, rain_hr, rf_rate) #%>%
@@ -198,7 +198,7 @@ subset(SiteID != 'MAR') %>%
   distinct()
   
   
-## **manual edit WOR 2018 RO 4 (WQ samples: 3010, 3016, 3019, 3027, 3030, 3035, 3039, 3044)**
+## **manual edit WOR 2018 RO 4 (WQ samples: 3010, 3016, 3019, 3027, 3030, 3035, 3039, 3043, 3044)**
 write.csv(ro_unique, "./data/tidy/runoff_event12UPDATE.csv",  row.names = FALSE) 
 
 
@@ -218,17 +218,17 @@ ro_joined <- ro_newtimes %>%
          ro_event = eventid) %>%
   drop_na(sampleID) %>%
   ungroup() %>%
-  select(SiteID, Year, Treatment, flow, flow_time, date_time, sampleID, tss_kg_ha, area_ha, ro_event)
+  dplyr::select(SiteID, Year, Treatment, flow, flow_time, date_time, sampleID, tss_kg_ha, area_ha, ro_event, sampleID)
 
 ro_cumulative <- ro_joined %>%
-  group_by(Year, SiteID, Treatment, sampleID, flow_time, flow) %>% 
+  group_by(Year, SiteID, Treatment, flow_time, flow, ro_event) %>% 
   summarize(tss_sum = sum(tss_kg_ha)) %>%
   ungroup() %>%
-  group_by(Year, SiteID, Treatment, sampleID) %>%
-  summarize(tss_sum = sum(tss_sum),
-            flow_sum = sum(flow),
-            flow_min = sum(flow_time),
-            ro_count = n()) %>%
+  #group_by(Year, SiteID, Treatment, sampleID) %>%
+  #summarize(tss_sum = sum(tss_sum),
+  #          flow_sum = sum(flow),
+  #          flow_min = sum(flow_time),
+  #          ro_count = n()) %>%
   subset(tss_sum > 0.000003977139) # sample 3010 is below detecable limit https://beta-static.fishersci.com/content/dam/fishersci/en_US/documents/programs/scientific/technical-documents/white-papers/apha-total-suspended-solids-procedure-white-paper.pdf
 
 

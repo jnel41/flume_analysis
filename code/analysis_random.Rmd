@@ -125,7 +125,7 @@ There are three main analyses of interest:
 
 
 ```{r designR_model, dependson = "flume_random"}
-mR_flume <- lmerTest::lmer(log(tss_sum+0.000359) ~
+mR_flume <- lmerTest::lmer(log(tss_sum+0.001) ~
                              Treatment*ln_ppt +
                             Treatment*crop +
                             Year*Treatment +

@@ -126,16 +126,16 @@ g
 
 
 ```{r, dependson="load"}
-h <- ggplot(full_df, aes(x=log(rain), y=log(tss_sum+0.001), color=Treatment), inherit.aes = FALSE) +
+h <- ggplot(full_df, aes(x=log(rain), y=log(tss_sum+0.001)), inherit.aes = FALSE) +
  scale_color_manual(values = c("control" = "#C38820",
                               "strips" = "#176D9C"),
                   #labels=c( "Control", "Prairie Strip"),
                     name  ="") +
 #h <- ggplot(full_df, aes(x=log(ppt_sum), y=log(tss_load+0.0016)), inherit.aes = FALSE) +
- geom_point(size=4) +
+ geom_point(aes(color=Treatment), size=4) +
  xlab("log(Rainfall Total (mm))") +
  ylab("log(TSS load (kg/ha))") +
- geom_smooth(method=lm, se=FALSE, fullrange=TRUE, size=2) +
+ geom_smooth(method=lm, se=FALSE, fullrange=TRUE, size=2, color="black") +
  ggtitle("A. Full Dataset") +
  theme(plot.title = element_text(family="serif", size=18, face="bold", hjust=0.5),
        axis.title.x = element_text(family="serif", size=18, face="bold"),
@@ -154,7 +154,7 @@ h <- ggplot(full_df, aes(x=log(rain), y=log(tss_sum+0.001), color=Treatment), in
 
 h
 
-ggsave("E:/ISU/Project/SoilMove/data/statistics/flume_analysis/code/fig/Reg_ppt_load.png", h, width = 12, height = 12)
+#ggsave("E:/ISU/Project/SoilMove/data/statistics/flume_analysis/code/fig/Reg_ppt_load.png", h, width = 12, height = 12)
 
 ```
 
@@ -451,7 +451,7 @@ resid_xpanel(m_flume_model)
 
 ```{r extract-contrast-ci, dependson="design_model"}
 extract_contrast_ci <- function(d) {
-  m <- lmerTest::lmer(update(m_flume, 
+  m <- lmerTest::lmer(update(m_flume_model, 
                           as.formula(paste0("~.+",d$variable))),
                     data = full_df) 
     
