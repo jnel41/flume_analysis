@@ -61,6 +61,16 @@ flumeR <- full_df %>%
 
 ## Site-year with rainfall event
 
+```{r, dependson="load"}
+site_year_rfevent <- flumeR %>%
+  dplyr::select(SiteID, Year, sample_event) %>%
+  unique()
+
+ggplot(site_year_rfevent, aes(Year, SiteID, fill=sample_event)) +
+  geom_tile()
+```
+
+
 ```{r, dependson="flume_random"}
 site_year_rfeventR <- flumeR %>%
   dplyr::select(SiteID, Year, sample_event) %>%
@@ -88,7 +98,7 @@ TSS_countsR <- flumeR %>%
 TSS_sumR <- flumeR %>%
   group_by(Year, SiteID, Treatment) %>%
   distinct() %>%
-  summarize(tss_sum = sum(tss_load), .groups = "drop")
+  summarize(tss_sum = sum(tss_sum), .groups = "drop")
 ```
 
 Plot the number of observations for each combination. 
@@ -115,51 +125,32 @@ There are three main analyses of interest:
 
 
 ```{r designR_model, dependson = "flume_random"}
-<<<<<<< HEAD:code/scratch/analysis_random.Rmd
-mR_flume <- lmerTest::lmer(log(tss_load+0.025) ~ 
-=======
-mR_flume <- lmerTest::lmer(log(tss_load+0.0016) ~ 
->>>>>>> 5543c56bb2da09fcc288c860826e8d700e90a5d1:code/analysis_random.Rmd
+mR_flume <- lmerTest::lmer(log(tss_sum+0.001) ~
                              Treatment*ln_ppt +
-                            #Treatment*crop +
+                            Treatment*crop +
                             Year*Treatment +
-                             #Treatment*Lfactor +
-                             #Treatment*LSfactor +
-                             #Treatment*Sfactor +
-                             #Treatment*slope75 +
-                            
-<<<<<<< HEAD:code/scratch/analysis_random.Rmd
-                            (1 | SiteID) + 
-                             #(1 | SiteID:Treatment) + #removed due to singular fit
-                            (1|Year:sample_event),# + #removed due to singular fit
-                            #(1|SiteID:Year:sample_event), 
-=======
-                            #(1 | SiteID) + #removed due to singular fit
-                             (1 | SiteID:Treatment) + 
+                            #(1 | SiteID) + 
+                             (1 | SiteID:Treatment) + #removed due to singular fit
                             #(1|Year:sample_event) + #removed due to singular fit
-                            (1|SiteID:Year:sample_event), 
->>>>>>> 5543c56bb2da09fcc288c860826e8d700e90a5d1:code/analysis_random.Rmd
+                            (1|SiteID:Year:sample_event),
                            
                           data = flumeR)
 
 
 summary(mR_flume)
-<<<<<<< HEAD:code/scratch/analysis_random.Rmd
 anova(mR_flume)
 performance::r2(mR_flume)
-=======
 #confint(mR_flume, oldNames = FALSE)
-anova(mR_flume)
 r2_nakagawa(mR_flume)
 icc(mR_flume)
 
->>>>>>> 5543c56bb2da09fcc288c860826e8d700e90a5d1:code/analysis_random.Rmd
 ```
 
 ```{r designR_step_model, dependson = "designR_model"}
 mR_flume_step <- step(mR_flume, reduce.random = FALSE, alpha.fixed = 0.1)
 mR_flume_model <- get_model(mR_flume_step)
 summary(mR_flume_model)
+anova(mR_flume_model)
 
 ##https://campus.datacamp.com/courses/hierarchical-and-mixed-effects-models-in-r/linear-mixed-effect-models?ex=7
 ```
@@ -188,41 +179,76 @@ trt_pptR  = emmeans(mR_flume, pairwise ~ Treatment|ln_ppt,
 
 confint(trt_pptR)$contrasts ## exp. the values
 
-#cropR      = emmeans(mR_flume, pairwise ~ Treatment|crop,   
-#                    type = "response",
-#                    lmer.df = "asymptotic")
+cropR      = emmeans(mR_flume, pairwise ~ Treatment|crop,   
+                    type = "response",
+                    lmer.df = "asymptotic")
 
-#confint(cropR)
+confint(cropR)$contrasts
 ```
 
+
+```{r, dependson="designR_model_contrasts"}
+cropR_em <- as.data.frame(cropR)
+ 
+kR <- cropR_em %>%
+  filter(contrast != "strips - control")
+ 
+cropR_em_plot <- kR %>%
+   ggplot(aes(x=Treatment, y=response, fill=crop))+
+   geom_bar(width = 0.5, position = position_dodge(), stat="summary") +
+   geom_errorbar(aes(ymin = (response-SE), ymax = (response+SE)),
+             width = 0.2,
+             linetype = "solid",
+             position = position_dodge(width = 0.5),
+             color="black", size=0.7) +
+   scale_fill_manual(values = c("corn" = "#FFCC33",
+                              "soybean" = "#339900"), 
+                    labels = c("Corn", "Soybean")) +
+   ggtitle("Comparison of Total Suspended Sediment (TSS) loads \n (Full Dataset)") +
+   xlab("Treatment") +
+   ylab("TSS Load \n(kg/ha)") +
+   theme(plot.title = element_text(size=20, face="bold", hjust=0.5),
+         axis.title.x = element_text(size=18, face="bold"),
+         axis.title.y = element_text(size=18, face="bold"),
+         axis.text.x = element_text(size=18),
+         axis.text.y = element_text(size=18)) #+
+  #scale_x_discrete(labels= c("Control", "Prairie Strip")) #+
+  #scale_y_continuous(limits = c(0, 40))
+ 
+cropR_em_plot
+
+```
+
+
+
 ```{r, dependson="load"}
-h <- ggplot(flumeR, aes(x=log(ppt_sum), y=log(tss_load+0.0016), color=Treatment), inherit.aes = FALSE) +
+h <- ggplot(flumeR, aes(x=log(rain), y=log(tss_sum+0.001), color=Treatment), inherit.aes = FALSE) +
  scale_color_manual(values = c("control" = "#C38820",
                               "strips" = "#176D9C"),
                     labels=c("Control", "Prairie Strip"),
                     name  ="") +
- geom_point(size=5) +
+ geom_point(size=4) +
  xlab("log(Rainfall Total (mm))") +
  ylab("log(TSS Load (kg/ha))") +
- geom_smooth(method=lm, se=FALSE, fullrange=TRUE, size=3) +
- ggtitle("B. Randomized Location Subset (Out)") +
- theme(plot.title = element_text(family="A", size=28, face="bold", hjust=0.5),
-       axis.title.x = element_text(family="A", size=28, face="bold"),
-       axis.title.y = element_text(family="A", size=28, face="bold"),
-       axis.text.x = element_text(family="A", size=28),
-       axis.text.y = element_text(family="A", size=28),
-       legend.text = element_text(family = "A", size=28),
-       legend.key.size = unit(3,"line")) +
+ geom_smooth(method=lm, se=FALSE, fullrange=TRUE, size=2) +
+ ggtitle("B. Randomized Location Subset") +
+ theme(plot.title = element_text(family="serif", size=18, face="bold", hjust=0.5),
+       axis.title.x = element_text(family="serif", size=18, face="bold"),
+       axis.title.y = element_text(family="serif", size=18, face="bold"),
+       axis.text.x = element_text(family="serif", size=18),
+       axis.text.y = element_text(family="serif", size=18),
+       legend.text = element_text(family = "serif", size=18),
+       legend.key.size = unit(2,"line")) +
  stat_poly_eq(formula = y ~ x,
               aes(label = paste(..eq.label.., ..rr.label.., ..p.value.label.., sep = "*`,`~")),
               parse = TRUE,
               label.x.npc = "left",
               label.y.npc = "top",
               vstep = 0.05,
-              size = 8)
+              size = 6)
 
 h
-ggsave("E:/ISU/Project/SoilMove/data/statistics/flume_analysis/code/fig/randReg_ppt_loadOUT.png", h, width = 12, height = 12)
+ggsave("E:/ISU/Project/SoilMove/data/statistics/flume_analysis/code/fig/randReg_ppt_load.png", h, width = 12, height = 12)
 ```
 
 # Check assumptions
@@ -254,8 +280,8 @@ resid_xpanel(mR_flume_model)
 groupR <- flumeR %>% 
   group_by(Treatment) %>% 
   summarize(n = n(), 
-            mean = mean(tss_load), 
-            sd = sd(tss_load),
+            mean = mean(tss_sum), 
+            sd = sd(tss_sum),
             .groups = "drop") %>%
   mutate(se = sd / sqrt(n),
          lb = mean + qt(0.025, df = n-1)*se,
@@ -274,13 +300,13 @@ trt_plotR <- groupR %>%
   ggtitle("B. Randomized Location Subset") +
   xlab("Treatment") +
   ylab("TSS Load (kg/ha)") +
-  theme(plot.title = element_text(family = "A", size=28, face="bold", hjust=0.5),
-       axis.title.x = element_text(family = "A", size=28, face="bold"),
-       axis.title.y = element_text(family = "A", size=28, face="bold"),
-       axis.text.x = element_text(family = "A", size=28),
-       axis.text.y = element_text(family = "A", size=28)) +
+  theme(plot.title = element_text(family = "serif", size=18, face="bold", hjust=0.5),
+       axis.title.x = element_text(family = "serif", size=18, face="bold"),
+       axis.title.y = element_text(family = "serif", size=18, face="bold"),
+       axis.text.x = element_text(family = "serif", size=18),
+       axis.text.y = element_text(family = "serif", size=18)) +
   scale_x_discrete(labels= c("Prairie Strip", "Control")) +
-  scale_y_continuous(limits = c(0, 50)) +
+  scale_y_continuous(limits = c(0, 40)) +
   theme(text = element_text())
 
 trt_plotR
@@ -314,7 +340,7 @@ extract_contrast_ci <- function(d) {
 
 
 ```{r treatment-effect-with-explanatory-variables, dependson=c("extract-contrast-ci")}
-add <- data.frame(variable = c("slope75", "C_factor", "K_factor", "LSfactor", "Lfactor", "Sfactor", "post_Lupslp", "post_Tupslp", "ln_ppt", "pre_Lupslp"))
+add <- data.frame(variable = c("ln_slp", "C_factor", "K_factor", "LSfactor", "Lfactor", "Sfactor", "ln_S", "ln_L", "ln_LS", "slope75", "ln_postL", "ln_postT"))
 
 added_variable_analysesR <- add %>% 
   group_by(variable) %>%
