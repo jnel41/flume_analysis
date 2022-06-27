@@ -183,7 +183,7 @@ ro_event <- ro_flags %>%
   ) %>% 
   # Compute time difference as duration of event, add 1 hour, knowing that the timestamp is the time when the rain record ends
   mutate(flow_time = as.numeric(difftime(eventEnd,eventStart, units = 'm')) + 1) %>%
-  subset(subset=!(SiteID=="WOR" & Treatment == "control" & Year == 2018 & eventid == 4))
+  #subset(subset=!(SiteID=="WOR" & Treatment == "control" & Year == 2018 & eventid == 4))
 
 ro_unique <- ro_event %>%
 subset(SiteID != 'MAR') %>%

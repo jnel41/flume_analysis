@@ -129,7 +129,7 @@ mR_flume <- lmerTest::lmer(log(tss_sum+0.001) ~
                              Treatment*ln_ppt +
                             Treatment*crop +
                             Year*Treatment +
-                            #(1 | SiteID) + 
+                            #(1 | SiteID) + #removed due to singular fit
                              (1 | SiteID:Treatment) + #removed due to singular fit
                             #(1|Year:sample_event) + #removed due to singular fit
                             (1|SiteID:Year:sample_event),
@@ -161,6 +161,7 @@ trt_yrR = emmeans(mR_flume, pairwise ~ Treatment|Year,
                     type = "response",
                     lmer.df = "asymptotic") 
 confint(trt_yrR)$contrasts
+trt_yrR$contrasts
 
 trtR    = emmeans(mR_flume, pairwise ~ Treatment, 
                     type = "response", 
@@ -222,22 +223,23 @@ cropR_em_plot
 
 
 ```{r, dependson="load"}
-h <- ggplot(flumeR, aes(x=log(rain), y=log(tss_sum+0.001), color=Treatment), inherit.aes = FALSE) +
+#h <- ggplot(flumeR, aes(x=log(rain), y=log(tss_sum+0.001)), inherit.aes = FALSE) +
+h <- ggplot(flumeR, aes(x=LSfactor, y=log(tss_sum+0.001)), inherit.aes = FALSE) +
  scale_color_manual(values = c("control" = "#C38820",
                               "strips" = "#176D9C"),
                     labels=c("Control", "Prairie Strip"),
                     name  ="") +
- geom_point(size=4) +
+ geom_point(aes(color=Treatment), size=6) +
  xlab("log(Rainfall Total (mm))") +
  ylab("log(TSS Load (kg/ha))") +
- geom_smooth(method=lm, se=FALSE, fullrange=TRUE, size=2) +
+ geom_smooth(method=lm, se=FALSE, fullrange=TRUE, size=2, color="black") +
  ggtitle("B. Randomized Location Subset") +
- theme(plot.title = element_text(family="serif", size=18, face="bold", hjust=0.5),
-       axis.title.x = element_text(family="serif", size=18, face="bold"),
-       axis.title.y = element_text(family="serif", size=18, face="bold"),
-       axis.text.x = element_text(family="serif", size=18),
-       axis.text.y = element_text(family="serif", size=18),
-       legend.text = element_text(family = "serif", size=18),
+ theme(plot.title = element_text(family="serif", size=28, face="bold", hjust=0.5),
+       axis.title.x = element_text(family="serif", size=28, face="bold"),
+       axis.title.y = element_text(family="serif", size=28, face="bold"),
+       axis.text.x = element_text(family="serif", size=28),
+       axis.text.y = element_text(family="serif", size=28),
+       legend.text = element_text(family = "serif", size=28),
        legend.key.size = unit(2,"line")) +
  stat_poly_eq(formula = y ~ x,
               aes(label = paste(..eq.label.., ..rr.label.., ..p.value.label.., sep = "*`,`~")),
@@ -245,7 +247,7 @@ h <- ggplot(flumeR, aes(x=log(rain), y=log(tss_sum+0.001), color=Treatment), inh
               label.x.npc = "left",
               label.y.npc = "top",
               vstep = 0.05,
-              size = 6)
+              size = 8)
 
 h
 ggsave("E:/ISU/Project/SoilMove/data/statistics/flume_analysis/code/fig/randReg_ppt_load.png", h, width = 12, height = 12)
@@ -300,18 +302,53 @@ trt_plotR <- groupR %>%
   ggtitle("B. Randomized Location Subset") +
   xlab("Treatment") +
   ylab("TSS Load (kg/ha)") +
-  theme(plot.title = element_text(family = "serif", size=18, face="bold", hjust=0.5),
-       axis.title.x = element_text(family = "serif", size=18, face="bold"),
-       axis.title.y = element_text(family = "serif", size=18, face="bold"),
-       axis.text.x = element_text(family = "serif", size=18),
-       axis.text.y = element_text(family = "serif", size=18)) +
+  theme(plot.title = element_text(family = "serif", size=20, face="bold", hjust=0.5),
+       axis.title.x = element_text(family = "serif", size=20, face="bold"),
+       axis.title.y = element_text(family = "serif", size=20, face="bold"),
+       axis.text.x = element_text(family = "serif", size=20),
+       axis.text.y = element_text(family = "serif", size=20)) +
   scale_x_discrete(labels= c("Prairie Strip", "Control")) +
-  scale_y_continuous(limits = c(0, 40)) +
+  #scale_y_continuous(limits = c(0, 40)) +
   theme(text = element_text())
 
 trt_plotR
 ggsave("E:/ISU/Project/SoilMove/data/statistics/flume_analysis/code/fig/randflume_plot.png", trt_plotR)
 
+trtyrR_grp <- flumeR %>% 
+  group_by(Year, Treatment) %>% 
+   summarize(n = n(), 
+             mean = mean(tss_sum), 
+             sd = sd(tss_sum),
+             groups = "drop") %>%
+   mutate(se = sd / sqrt(n),
+          lb = mean + qt(0.025, df = n-1)*se,
+          ub = mean - qt(0.025, df = n-1)*se)
+ 
+ trtR_plot <- trtyrR_grp %>%
+   ggplot(aes(x=Year, y=mean, fill=Treatment))+
+   geom_bar(width = 0.5, position = position_dodge(), stat="summary") +
+   geom_errorbar(aes(ymin = (mean-se), ymax = (mean+se)),
+                 width = 0.3,
+                 linetype = "solid",
+                 position = position_dodge(width = 0.5),
+                 color="black", size=0.7) +
+   scale_fill_manual(values = c("control" = "#C38820",
+                               "strips" = "#176D9C")) +
+   ggtitle("B. Randomized Location Subset") +
+   xlab("Treatment") +
+   ylab("TSS Load (kg/ha)") +
+  theme(plot.title = element_text(family="serif", size=20, face="bold", hjust=0.5),
+        axis.title.x = element_text(family="serif", size=20, face="bold"),
+        axis.title.y = element_text(family="serif", size=20, face="bold"),
+        axis.text.x = element_text(family="serif", size=20),
+        axis.text.y = element_text(family="serif", size=20)) #+
+   #scale_x_discrete(labels= c("Prairie Strip", "Control"))+
+   #scale_y_continuous(limits = c(0, 40))
+ 
+ trtR_plot
+
+ ggsave("E:/ISU/Project/SoilMove/data/statistics/flume_analysis/code/fig/randflumeyr_plot.png", trtR_plot)
+ 
 ```
 
 
@@ -341,6 +378,9 @@ extract_contrast_ci <- function(d) {
 
 ```{r treatment-effect-with-explanatory-variables, dependson=c("extract-contrast-ci")}
 add <- data.frame(variable = c("ln_slp", "C_factor", "K_factor", "LSfactor", "Lfactor", "Sfactor", "ln_S", "ln_L", "ln_LS", "slope75", "ln_postL", "ln_postT"))
+
+add <- data.frame(variable = c("ln_S", "ln_L", "ln_LS", "slope75", "ln_postL", "ln_postT"))
+
 
 added_variable_analysesR <- add %>% 
   group_by(variable) %>%

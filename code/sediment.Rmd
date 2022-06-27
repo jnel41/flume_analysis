@@ -13,7 +13,7 @@ library("tidyverse")
 
 options(scipen = 999)
 
-flume <- read_csv("../data/tidy/rf12ro12event_UPDATEmanual.csv") %>%
+flume <- read_csv("../data/tidy/rf12ro12event_UPDATE3manual.csv") %>%
   mutate(Year = factor(Year)) %>%
   subset(SiteID != 'MAR') %>%
   subset(subset=!(SiteID=="MCN" & Year == 2016)) %>%
