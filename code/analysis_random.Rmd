@@ -379,8 +379,6 @@ extract_contrast_ci <- function(d) {
 ```{r treatment-effect-with-explanatory-variables, dependson=c("extract-contrast-ci")}
 add <- data.frame(variable = c("ln_slp", "C_factor", "K_factor", "LSfactor", "Lfactor", "Sfactor", "ln_S", "ln_L", "ln_LS", "slope75", "ln_postL", "ln_postT"))
 
-add <- data.frame(variable = c("ln_S", "ln_L", "ln_LS", "slope75", "ln_postL", "ln_postT"))
-
 
 added_variable_analysesR <- add %>% 
   group_by(variable) %>%

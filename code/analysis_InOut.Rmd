@@ -198,7 +198,7 @@ There are three main analyses of interest:
 ### Treatment effect: Flume Out
 
 ```{r design_model_Out, dependson = "load"}
-mOut <- lmerTest::lmer(log(tss_load+0.0016) ~ 
+mOut <- lmerTest::lmer(log(tss_sum+0.001) ~ 
                              Treatment*ln_ppt +
                             Treatment*crop +
                             Year*Treatment +
@@ -208,7 +208,7 @@ mOut <- lmerTest::lmer(log(tss_load+0.0016) ~
                             (1|Year:sample_event) + #consider this and below with SiteID 
                             (1|SiteID:Year:sample_event), 
                           
-                          data = full_out)
+                          data = full_in)
 
 summary(mOut)
 confint(mOut, oldNames = FALSE)

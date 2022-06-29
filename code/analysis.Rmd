@@ -109,6 +109,17 @@ TSS_counts <- full_df %>%
   group_by(Year, SiteID, Treatment, crop, random) %>%
   distinct() %>%
   summarize(n = n(), .groups = "drop")
+
+TSS_Lfactor <- full_df %>%
+  group_by(Lfactor, SiteID, Treatment) %>%
+  summarize(mean = mean(tss_sum),
+            sd = sd(tss_sum),
+            n = n(), 
+            .groups = "drop") %>%
+  mutate(se = sd / sqrt(n),
+         lb = mean + qt(0.025, df = n-1)*se,
+         ub = mean - qt(0.025, df = n-1)*se) %>%
+  subset(mean < 22)
 ```
 
 Plot the number of observations for each combination. 
@@ -126,16 +137,18 @@ g
 
 
 ```{r, dependson="load"}
-#h <- ggplot(full_df, aes(x=log(rain), y=log(tss_sum+0.001)), inherit.aes = FALSE) +
+#h <- ggplot(full_df, aes(x=log(rain), y=log(tss_sum+0.001), color=Treatment), inherit.aes = FALSE) +
 #h <- ggplot(full_df, aes(x=Lfactor, y=log(tss_sum+0.001), color=Treatment), inherit.aes = FALSE) +
-h <- ggplot(full_df, aes(x=log(post_Lupslp), y=log(tss_sum+0.001), color=Treatment), inherit.aes = FALSE) +
+h <- ggplot(TSS_Lfactor, aes(x=Lfactor, y=mean, color=Treatment), inherit.aes = FALSE) +
  scale_color_manual(values = c("control" = "#C38820",
                               "strips" = "#176D9C"),
-                  #labels=c( "Control", "Prairie Strip"),
+                  labels=c( "Control", "Prairie Strip"),
                     name  ="") +
+  geom_errorbar(aes(ymin=mean-se, ymax=mean+se), colour="black", width=.1) +
  geom_point(aes(color=Treatment), size=6) +
- xlab("log(Longest Flow Length Upslope)") +
- ylab("log(TSS load (kg/ha))") +
+  
+ xlab("L Factor") +
+ ylab("Mean TSS load (kg/ha)") +
  geom_smooth(method=lm, se=FALSE, fullrange=TRUE, size=2) +
  ggtitle("A. Full Dataset") +
  theme(plot.title = element_text(family="serif", size=28, face="bold", hjust=0.5),
@@ -155,31 +168,19 @@ h <- ggplot(full_df, aes(x=log(post_Lupslp), y=log(tss_sum+0.001), color=Treatme
 
 h
 
-ggsave("E:/ISU/Project/SoilMove/data/statistics/flume_analysis/code/fig/Reg_lfactor_load.png", h, width = 12, height = 12)
+#ggsave("E:/ISU/Project/SoilMove/data/statistics/flume_analysis/code/fig/Reg_lfactor_load.png", h, width = 12, height = 12)
 
 ```
 
 ```{r mean_data, dependson = "load"}
-load_sum <- full_df %>%
-  group_by(Year, SiteID, Treatment, crop) %>%
-  summarize(sum_load             = sum(tss_load, na.rm = TRUE),
-            log_load = mean(log(sum_load), na.rm = TRUE),
-            n                   = n(),
-            .groups = "drop")
+load_time <- read_csv("../data/tidy/load_weight_year220622.csv")
+load_time
 
+model <- lm(log(tss_sum+0.001) ~ Treatment*Lfactor,
+            data = full_df)
 
-ppt_sum <- full_df %>%
-  group_by(Year, SiteID, Treatment) %>%
-  summarize(sum_ppt             = sum(ppt_sum, na.rm = TRUE)*1000,
-            #log_load = mean(log(sum_load), na.rm = TRUE),
-            n                   = n(),
-            .groups = "drop")
-
-TSS_sum <- full_df %>%
-  group_by(Year, SiteID, Treatment) %>%
-  distinct() %>%
-  summarize(tss_sum = sum(tss_load), .groups = "drop")
-
+summary(model)
+anova(model)
 ```
 
 ```{r wp_plot, dependson = "plot_data", eval = FALSE, echo = FALSE}
@@ -254,10 +255,9 @@ m_flume <- lmerTest::lmer(log(tss_sum+0.001) ~
                              Treatment*ln_ppt +
                             Treatment*crop +
                             Year*Treatment +
-                            Treatment*Lfactor +
                             #(1 | SiteID) + #removed due to singular fit
                              (1 | SiteID:Treatment) + 
-                            #(1|Year:sample_event) + #consider this and below with SiteID 
+                            (1|Year:sample_event) + #consider this and below with SiteID 
                             (1|SiteID:Year:sample_event), 
                           
                           data = full_df)
