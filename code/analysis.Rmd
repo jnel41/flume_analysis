@@ -64,8 +64,8 @@ load("full_df.RData")
 
 ##Statistical significance between treatments
 rusle <- read_csv("../data/scratch/rusle_calculations.csv") %>%
-    filter(Scenario == "current") %>%
-  filter(random == "R")
+    filter(Scenario == "pre-prairie") #%>%
+  #filter(random == "R")
 
 control <- rusle$control
 strips <- rusle$strips
@@ -105,21 +105,22 @@ Calculate the number of observations for each treatment-position-year-site-time
 combination. 
 
 ```{r sample_event_counts, dependson="load"}
-TSS_counts <- full_df %>%
-  group_by(Year, SiteID, Treatment, crop, random) %>%
-  distinct() %>%
-  summarize(n = n(), .groups = "drop")
-
 TSS_Lfactor <- full_df %>%
-  group_by(Lfactor, SiteID, Treatment) %>%
-  summarize(mean = mean(tss_sum),
+  group_by(Lfactor, Sfactor, LSfactor, SiteID, Treatment) %>%
+  summarize(ln_mean = mean(log(tss_sum+0.001)),
+            ln_sd = sd(log(tss_sum+0.001)),
+            mean = mean(tss_sum),
             sd = sd(tss_sum),
             n = n(), 
             .groups = "drop") %>%
   mutate(se = sd / sqrt(n),
          lb = mean + qt(0.025, df = n-1)*se,
-         ub = mean - qt(0.025, df = n-1)*se) %>%
-  subset(mean < 22)
+         ub = mean - qt(0.025, df = n-1)*se)
+
+slope_factors <- TSS_Lfactor %>%
+  gather(value, key = "factor", Lfactor:LSfactor) #%>%
+  #spread(key=Treatment, value=c("mean"))
+
 ```
 
 Plot the number of observations for each combination. 
@@ -144,11 +145,11 @@ h <- ggplot(TSS_Lfactor, aes(x=Lfactor, y=mean, color=Treatment), inherit.aes = 
                               "strips" = "#176D9C"),
                   labels=c( "Control", "Prairie Strip"),
                     name  ="") +
-  geom_errorbar(aes(ymin=mean-se, ymax=mean+se), colour="black", width=.1) +
+  geom_errorbar(aes(ymin=mean-se, ymax=mean+se), colour="gray", width=.1) +
  geom_point(aes(color=Treatment), size=6) +
   
  xlab("L Factor") +
- ylab("Mean TSS load (kg/ha)") +
+ ylab("Mean TSS load (log(kg/ha))") +
  geom_smooth(method=lm, se=FALSE, fullrange=TRUE, size=2) +
  ggtitle("A. Full Dataset") +
  theme(plot.title = element_text(family="serif", size=28, face="bold", hjust=0.5),
@@ -162,7 +163,7 @@ h <- ggplot(TSS_Lfactor, aes(x=Lfactor, y=mean, color=Treatment), inherit.aes = 
               aes(label = paste(..eq.label.., ..rr.label.., ..p.value.label.., sep = "*`,`~")),
               parse = TRUE,
               label.x.npc = "left",
-              label.y.npc = "top",
+              label.y.npc = "bottom",
               vstep = 0.05,
               size = 8)
 
@@ -172,11 +173,43 @@ h
 
 ```
 
+```{r, dependson="load"}
+g <- slope_factors %>%
+   filter(Treatment == "control") %>%
+  ggplot(aes(SiteID, mean))  + 
+  geom_bar(aes(x=SiteID, y=mean), stat="identity", fill= "gray") +
+  geom_line(aes(x=SiteID, y=value*100, color = factor, group=factor),stat="identity", size=2)+
+  labs(title= "Full Dataset: Control Subcatchments",
+       x="Site ID",y="Mean TSS Load") +
+  scale_y_continuous(sec.axis=sec_axis(~.*0.01,name="Slope Factor"))
+g
+ 
+ggsave("../code/fig/control_factors_load.png", g, width = 12, height = 12)
+
+```
+
+
+```{r, dependson="load"}
+gg <- slope_factors %>%
+   filter(Treatment == "strips") %>%
+  ggplot(aes(SiteID, mean))  + 
+  geom_bar(aes(x=SiteID, y=mean), stat="identity", fill= "gray") +
+  geom_line(aes(x=SiteID, y=value*100, color = factor, group=factor),stat="identity", size=2)+
+  labs(title= "Full Dataset: Prairie Strip Subcatchments",
+       x="Site ID",y="Mean TSS Load") +
+  scale_y_continuous(sec.axis=sec_axis(~.*0.01,name="Slope Factor"))
+gg
+ 
+ggsave("../code/fig/strip_factors_load.png", gg, width = 12, height = 12)
+
+```
+
+
 ```{r mean_data, dependson = "load"}
 load_time <- read_csv("../data/tidy/load_weight_year220622.csv")
 load_time
 
-model <- lm(log(tss_sum+0.001) ~ Treatment*Lfactor,
+model <- lm(log(tss_sum+0.001) ~ Treatment*Lfact_below,
             data = full_df)
 
 summary(model)
@@ -543,7 +576,7 @@ extract_contrast_ci <- function(d) {
 
 
 ```{r treatment-effect-with-explanatory-variables, dependson=c("extract-contrast-ci")}
-add <- data.frame(variable = c("ln_slp", "C_factor", "K_factor", "LSfactor", "Lfactor", "Sfactor", "ln_S", "ln_L", "ln_LS", "slope75", "ln_postL", "ln_postT"))
+add <- data.frame(variable = c("ln_slp", "C_factor", "K_factor", "LSfactor", "Lfact_below", "LSfact_below", "Lfactor", "Sfactor", "ln_S", "ln_L", "ln_LS", "slope75", "ln_postL", "ln_postT"))
 
 added_variable_analyses <- add %>% 
   group_by(variable) %>%

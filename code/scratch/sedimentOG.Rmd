@@ -27,6 +27,47 @@ flume <- read_csv("../data/tidy/rf12ro12event_UPDATE4manual.csv") %>%
 
 ```
 
+```{r total, dependson="create_sediment"}
+flume_sum <- flume %>%
+  group_by(Treatment, Year, SiteID, sample_event, tss_sum, crop, slope75, LSfactor, Lfactor, Sfactor, C_factor, K_factor, post_Lupslp, post_Tupslp, pre_Lupslp) %>%
+  summarize(tss_load = tss_sum) %>%
+  distinct() 
+
+
+ppt_sum <- flume %>%
+  group_by(Treatment, Year, SiteID, sample_event, crop, slope75, LSfactor, Lfactor, Sfactor, C_factor, K_factor, post_Lupslp, post_Tupslp, pre_Lupslp) %>%
+  #group_by(Treatment, Year, SiteID, sample_event, crop) %>%
+  summarize(ppt_sum = sum(precipitation)) %>%
+  ungroup() %>%
+  filter(!duplicated(cbind(Year, SiteID, sample_event)))
+
+```
+
+
+```{r pivot tables, dependson = "total"}
+sampl_anova <- flume_sum %>%
+  filter(!is.na(tss_sum)) %>%
+  dplyr::select(Year, SiteID, Treatment, sample_event, tss_sum, crop) %>%
+  group_by(SiteID, Year, Treatment, sample_event, crop) %>%
+  summarize(tss_load = sum(tss_sum)) %>% 
+  ungroup() %>%
+  dplyr::select(Year, SiteID, Treatment, sample_event, tss_load, crop) %>%
+  pivot_wider(names_from = Treatment, values_from = tss_load)
+
+pivot_sample <- sampl_anova %>%
+  inner_join(ppt_sum,by=c("SiteID", "Year", "sample_event", "crop")) %>%
+  filter(!is.na(strips)) %>%
+  mutate(ln_ppt = log(ppt_sum)) %>%
+  subset(select = -c(Treatment))
+
+long_load <- pivot_sample %>%
+  gather(Treatment, tss_load, control:strips) %>%
+  arrange(Treatment, tss_load) %>%
+  filter(!is.na(diff)) %>%
+  dplyr::select(SiteID, Treatment, Year, sample_event, tss_load, ppt_sum, crop)
+
+```
+
 
 ```{r random coding, dependson = "pivot tables"}
 #rf_ro_pivot <- long_load %>%
@@ -39,6 +80,14 @@ rf_ro_pivot <- flume %>%
   ifelse(SiteID == 'WHI', 'NR',
   ifelse(SiteID == 'WOR', 'R', 0)))))))))
 
+long_load <- long_load %>%
+  mutate(random = (ifelse(SiteID == 'ARM', 'NR',
+  ifelse(SiteID == 'EIA', 'R',
+  ifelse(SiteID == 'MCN', 'R', 
+  ifelse(SiteID == 'HOE', 'NR',
+  ifelse(SiteID == 'RHO', 'R',
+  ifelse(SiteID == 'WHI', 'NR',
+  ifelse(SiteID == 'WOR', 'R', 0)))))))))
 ```
 
 ```{r full_dataframe, dependson = "random coding"}
