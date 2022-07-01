@@ -29,7 +29,6 @@ flume <- read_csv("../data/tidy/rf12ro12event_UPDATE4manual.csv") %>%
 
 
 ```{r random coding, dependson = "pivot tables"}
-#rf_ro_pivot <- long_load %>%
 rf_ro_pivot <- flume %>%
   mutate(random = (ifelse(SiteID == 'ARM', 'NR',
   ifelse(SiteID == 'EIA', 'R',

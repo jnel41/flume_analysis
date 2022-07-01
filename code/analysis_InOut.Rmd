@@ -43,13 +43,15 @@ sessionInfo()
 
 ## Read in data
 ```{r load, dependson= "full_dataframe"}
-full_out <- read_csv("../data/tidy/full_df_out.csv") %>%
+fullR_out <- read_csv("../data/tidy/full_df_out.csv") %>%
   mutate(Year = factor(Year),
-         Treatment = factor(Treatment, levels=c('strips','control')))
+         Treatment = factor(Treatment, levels=c('strips','control'))) #%>%
+    #subset(random == 'R')
 
-full_in <- read_csv("../data/tidy/full_df_in.csv") %>%
+fullR_in <- read_csv("../data/tidy/full_df_in.csv") %>%
   mutate(Year = factor(Year),
-         Treatment = factor(Treatment, levels=c('strips','control')))
+         Treatment = factor(Treatment, levels=c('strips','control'))) #%>%
+    #subset(random == 'R')
 
 ```
 
@@ -59,7 +61,7 @@ full_in <- read_csv("../data/tidy/full_df_in.csv") %>%
 ## Flume Out: Site-year with sample event
 
 ```{r, dependson="load"}
-site_year_eventOut <- full_out %>%
+site_year_eventOut <- fullR_out %>%
   dplyr::select(SiteID, Year, sample_event) %>%
   unique()
 
@@ -70,7 +72,7 @@ ggplot(site_year_eventOut, aes(Year, SiteID, fill=sample_event)) +
 ## Flume In: Site-year with sample event
 
 ```{r, dependson="load"}
-site_year_eventIn <- full_in %>%
+site_year_eventIn <- fullR_in %>%
   dplyr::select(SiteID, Year, sample_event) %>%
   unique()
 
@@ -205,13 +207,13 @@ mOut <- lmerTest::lmer(log(tss_sum+0.001) ~
                             
                             #(1 | SiteID) + #removed due to singular fit
                              (1 | SiteID:Treatment) + 
-                            (1|Year:sample_event) + #consider this and below with SiteID 
-                            (1|SiteID:Year:sample_event), 
+                            (1|Year:sample_event), # + #consider this and below with SiteID 
+                            #(1|SiteID:Year:sample_event), 
                           
-                          data = full_in)
+                          data = fullR_out)
 
 summary(mOut)
-confint(mOut, oldNames = FALSE)
+#confint(mOut, oldNames = FALSE)
 anova(mOut)
 r2_nakagawa(mOut)
 icc(mOut)
@@ -258,6 +260,7 @@ trt_yrO = emmeans(mOut, pairwise ~ Treatment|Year,
                     type = "response",
                     lmer.df = "asymptotic") 
 confint(trt_yrO)$contrasts
+trt_yrO$contrasts
 
 trtO = emmeans(mOut, pairwise ~ Treatment, 
                     type = "response", 
@@ -274,6 +277,7 @@ cropO      = emmeans(mOut, pairwise ~ Treatment|crop,
                     lmer.df = "asymptotic")
 
 confint(cropO)$contrasts
+cropO$contrasts
 
 ```
 
@@ -431,12 +435,11 @@ trt_plotI
 
 
 
-
 ```{r extract-contrast-ci, dependson="design_model"}
 extract_contrast_ci <- function(d) {
-  m <- lmerTest::lmer(update(m_flume, 
+  m <- lmerTest::lmer(update(mOut, 
                           as.formula(paste0("~.+",d$variable))),
-                    data = full_df) 
+                    data = fullR_out) 
     
   # Obtain coefficient for new variable
   av <- anova(m)
@@ -502,5 +505,223 @@ hOut <- ggplot(full_out, aes(x=log(ppt_sum), y=log(tss_load+0.0016), color=Treat
 hOut
 
 #ggsave("E:/ISU/Project/SoilMove/data/statistics/flume_analysis/code/fig/Reg_ppt_loadOUT.png", hOut, width = 12, height = 12)
+
+```
+
+
+```{r sample_event_counts, dependson="load"}
+rain_activity <- read_csv("../data/tidy/rain_event12UPDATE.csv") %>%
+  mutate(Year = factor(Year)) %>%
+  subset(SiteID != 'MAR') %>%
+  subset(subset=!(SiteID=="MCN" & Year == 2016)) %>%
+  subset(subset=!(SiteID=="MCN" & Year == 2017)) %>%
+  subset(subset=!(SiteID=="MCN" & Year == 2018)) %>%
+  subset(subset=!(SiteID=="MCN" & Year == 2019)) %>%
+  subset(subset=!(SiteID=="MCN" & Year == 2020)) %>%
+  subset(subset=!(SiteID=="RHO" & Year == 2016)) %>%
+  subset(subset=!(SiteID=="RHO" & Year == 2017))#%>%
+  #distinct(Year, SiteID, rf_event, .keep_all = TRUE)
+
+```
+
+
+
+```{r sample_event_counts, dependson="load"}
+rain_countIN <- rain_activity %>%
+  subset(Time != 0) %>%
+  group_by(SiteID) %>%
+  summarize(
+    mean_rate = mean(rf_rate),
+    sd_rate = sd(rf_rate),
+    sum_rain = sum(rain_mm),
+    sum_time = sum(rain_hr),
+    n = n(), .groups = "drop") %>%
+   mutate(se_rate = sd_rate / sqrt(n),
+          lb = mean_rate + qt(0.025, df = n-1)*se_rate,
+          ub = mean_rate - qt(0.025, df = n-1)*se_rate)
+
+rain_countOUT <- rain_activity %>%
+  subset(Time == 0) %>%
+  group_by(SiteID) %>%
+  summarize(
+    mean_rate = mean(rf_rate),
+    sd_rate = sd(rf_rate),
+    sum_rain = sum(rain_mm),
+    sum_time = sum(rain_hr),
+    n = n(), .groups = "drop") %>%
+   mutate(se_rate = sd_rate / sqrt(n),
+          lb = mean_rate + qt(0.025, df = n-1)*se_rate,
+          ub = mean_rate - qt(0.025, df = n-1)*se_rate)
+
+rain_countAll <- rain_activity %>%
+  group_by(SiteID) %>%
+  summarize(
+    mean_rate = mean(rf_rate),
+    sd_rate = sd(rf_rate),
+    sum_rain = sum(rain_mm),
+    sum_time = sum(rain_hr),
+    n = n(), .groups = "drop")%>%
+   mutate(se_rate = sd_rate / sqrt(n),
+          lb = mean_rate + qt(0.025, df = n-1)*se_rate,
+          ub = mean_rate - qt(0.025, df = n-1)*se_rate)
+
+rain_countTime <- rain_activity %>%
+  group_by(SiteID, Time) %>%
+  subset(Time != 0) %>%
+  summarize(
+    mean_rate = mean(rf_rate),
+    sd_rate = sd(rf_rate),
+    sum_rain = sum(rain_mm),
+    sum_time = sum(rain_hr),
+    n = n(), .groups = "drop")%>%
+   mutate(se_rate = sd_rate / sqrt(n),
+          lb = mean_rate + qt(0.025, df = n-1)*se_rate,
+          ub = mean_rate - qt(0.025, df = n-1)*se_rate)
+
+```
+
+
+```{r mean_tss_figure, dependson="load"}
+rain_meanIN <- rain_countIN %>%
+  ggplot(aes(x=SiteID, y=mean_rate))+
+  geom_bar(width = 0.5, position = position_dodge(), stat="summary") +
+  geom_errorbar(aes(ymin = (mean_rate-se_rate), ymax = (mean_rate+se_rate)),
+              width = 0.2,
+              linetype = "solid",
+              position = position_dodge(width = 0.5),
+              color="black", size=0.7) +
+  ggtitle("A. Full Dataset: Rainfall Intensity when Pads Deployed") +
+  xlab("Site") +
+  ylab("Mean Rainfall rate (mm/hr)") +
+ theme(plot.title = element_text(family="serif", size=18, face="bold", hjust=0.5),
+       axis.title.x = element_text(family="serif", size=18, face="bold"),
+       axis.title.y = element_text(family="serif", size=18, face="bold"),
+       axis.text.x = element_text(family="serif", size=18),
+       axis.text.y = element_text(family="serif", size=18)) +
+  scale_y_continuous(limits = c(0, 60))
+
+rain_meanIN
+#ggsave("E:/ISU/Project/SoilMove/data/statistics/flume_analysis/code/fig/flume_plot.png", trt_plot)
+
+rain_sumIN <- rain_countIN %>%
+  ggplot(aes(x=SiteID, y=sum_rain))+
+  geom_bar(width = 0.5, position = position_dodge(), stat="summary") +
+  ggtitle("A. Full Dataset: Rainfall Accumulation when Pads Deployed") +
+  xlab("Site") +
+  ylab("Total Rainfall (mm)") +
+ theme(plot.title = element_text(family="serif", size=18, face="bold", hjust=0.5),
+       axis.title.x = element_text(family="serif", size=18, face="bold"),
+       axis.title.y = element_text(family="serif", size=18, face="bold"),
+       axis.text.x = element_text(family="serif", size=18),
+       axis.text.y = element_text(family="serif", size=18)) +
+  scale_y_continuous(limits = c(0, 4000))
+
+rain_sumIN
+
+```
+
+```{r mean_tss_figure, dependson="load"}
+rain_meanOUT <- rain_countOUT %>%
+  ggplot(aes(x=SiteID, y=mean_rate))+
+  geom_bar(width = 0.5, position = position_dodge(), stat="summary") +
+  geom_errorbar(aes(ymin = (mean_rate-se_rate), ymax = (mean_rate+se_rate)),
+              width = 0.2,
+              linetype = "solid",
+              position = position_dodge(width = 0.5),
+              color="black", size=0.7) +
+    ggtitle("A. Full Dataset: Rainfall Intensity when Pads are Absent") +
+  xlab("Site") +
+  ylab("Mean Rainfall rate (mm/hr)") +
+ theme(plot.title = element_text(family="serif", size=18, face="bold", hjust=0.5),
+       axis.title.x = element_text(family="serif", size=18, face="bold"),
+       axis.title.y = element_text(family="serif", size=18, face="bold"),
+       axis.text.x = element_text(family="serif", size=18),
+       axis.text.y = element_text(family="serif", size=18)) +
+  scale_y_continuous(limits = c(0, 60))
+
+rain_meanOUT
+#ggsave("E:/ISU/Project/SoilMove/data/statistics/flume_analysis/code/fig/flume_plot.png", trt_plot)
+
+rain_sumOUT <- rain_countOUT %>%
+  ggplot(aes(x=SiteID, y=sum_rain))+
+  geom_bar(width = 0.5, position = position_dodge(), stat="summary") +
+  ggtitle("A. Full Dataset: Rainfall Accumulation when Pads are Absent") +
+  xlab("Site") +
+  ylab("Total Rainfall (mm)") +
+ theme(plot.title = element_text(family="serif", size=18, face="bold", hjust=0.5),
+       axis.title.x = element_text(family="serif", size=18, face="bold"),
+       axis.title.y = element_text(family="serif", size=18, face="bold"),
+       axis.text.x = element_text(family="serif", size=18),
+       axis.text.y = element_text(family="serif", size=18)) +
+  scale_y_continuous(limits = c(0, 4000))
+
+rain_sumOUT
+
+```
+
+
+```{r mean_tss_figure, dependson="load"}
+rain_meanAll <- rain_countAll %>%
+  ggplot(aes(x=SiteID, y=mean_rate))+
+  geom_bar(width = 0.5, position = position_dodge(), stat="summary") +
+  geom_errorbar(aes(ymin = (mean_rate-se_rate), ymax = (mean_rate+se_rate)),
+              width = 0.2,
+              linetype = "solid",
+              position = position_dodge(width = 0.5),
+              color="black", size=0.7) +
+    ggtitle("A. Full Dataset: Annual Rainfall Intensity") +
+  xlab("Site") +
+  ylab("Mean Rainfall rate (mm/hr)") +
+ theme(plot.title = element_text(family="serif", size=18, face="bold", hjust=0.5),
+       axis.title.x = element_text(family="serif", size=18, face="bold"),
+       axis.title.y = element_text(family="serif", size=18, face="bold"),
+       axis.text.x = element_text(family="serif", size=18),
+       axis.text.y = element_text(family="serif", size=18)) +
+  scale_y_continuous(limits = c(0, 60))
+
+rain_meanAll
+#ggsave("E:/ISU/Project/SoilMove/data/statistics/flume_analysis/code/fig/flume_plot.png", trt_plot)
+
+rain_sumAll <- rain_countAll %>%
+  ggplot(aes(x=SiteID, y=sum_rain))+
+  geom_bar(width = 0.5, position = position_dodge(), stat="summary") +
+  ggtitle("A. Full Dataset: Annual Rainfall Accumulation") +
+  xlab("Site") +
+  ylab("Total Rainfall (mm)") +
+ theme(plot.title = element_text(family="serif", size=18, face="bold", hjust=0.5),
+       axis.title.x = element_text(family="serif", size=18, face="bold"),
+       axis.title.y = element_text(family="serif", size=18, face="bold"),
+       axis.text.x = element_text(family="serif", size=18),
+       axis.text.y = element_text(family="serif", size=18)) +
+  scale_y_continuous(limits = c(0,4000))
+
+rain_sumAll
+
+```
+
+
+```{r mean_tss_figure, dependson="load"}
+
+##I think I need to separate this out by year because time isn't consistent.
+rain_Time <- rain_countTime %>%
+   ggplot(aes(x=SiteID, y=mean_rate, fill=as.factor(Time)))+
+   geom_bar(width = 0.5, position = position_dodge(), stat="summary") +
+   geom_errorbar(aes(ymin = (mean_rate-se_rate), ymax = (mean_rate+se_rate)),
+                 width = 0.3,
+                 linetype = "solid",
+                 position = position_dodge(width = 0.5),
+                 color="black", size=0.7) +
+   ggtitle("A. Full Dataset") +
+   xlab("Treatment") +
+   ylab("TSS Load (kg/ha)") +
+  theme(plot.title = element_text(family="serif", size=20, face="bold", hjust=0.5),
+        axis.title.x = element_text(family="serif", size=20, face="bold"),
+        axis.title.y = element_text(family="serif", size=20, face="bold"),
+        axis.text.x = element_text(family="serif", size=20),
+        axis.text.y = element_text(family="serif", size=20)) #+
+   #scale_x_discrete(labels= c("Prairie Strip", "Control"))+
+   #scale_y_continuous(limits = c(0, 125))
+rain_Time
+#ggsave("E:/ISU/Project/SoilMove/data/statistics/flume_analysis/code/fig/flume_plot.png", trt_plot)
 
 ```

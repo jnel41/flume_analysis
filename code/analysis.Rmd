@@ -113,7 +113,7 @@ TSS_Lfactor <- full_df %>%
             sd = sd(tss_sum),
             n = n(), 
             .groups = "drop") %>%
-  mutate(se = sd / sqrt(n),
+  mutate(se = ln_sd / sqrt(n),
          lb = mean + qt(0.025, df = n-1)*se,
          ub = mean - qt(0.025, df = n-1)*se)
 
@@ -138,17 +138,16 @@ g
 
 
 ```{r, dependson="load"}
-#h <- ggplot(full_df, aes(x=log(rain), y=log(tss_sum+0.001), color=Treatment), inherit.aes = FALSE) +
+h <- ggplot(full_df, aes(x=log(rain), y=log(tss_sum+0.001)), inherit.aes = FALSE) +
 #h <- ggplot(full_df, aes(x=Lfactor, y=log(tss_sum+0.001), color=Treatment), inherit.aes = FALSE) +
-h <- ggplot(TSS_Lfactor, aes(x=Lfactor, y=mean, color=Treatment), inherit.aes = FALSE) +
+#h <- ggplot(TSS_Lfactor, aes(x=Lfactor, y=ln_mean, color=Treatment), inherit.aes = FALSE) +
  scale_color_manual(values = c("control" = "#C38820",
                               "strips" = "#176D9C"),
                   labels=c( "Control", "Prairie Strip"),
                     name  ="") +
-  geom_errorbar(aes(ymin=mean-se, ymax=mean+se), colour="gray", width=.1) +
+  #geom_errorbar(aes(ymin=ln_mean-se, ymax=ln_mean+se), colour="gray", width=.1) +
  geom_point(aes(color=Treatment), size=6) +
-  
- xlab("L Factor") +
+ xlab("Rainfall (mm)") +
  ylab("Mean TSS load (log(kg/ha))") +
  geom_smooth(method=lm, se=FALSE, fullrange=TRUE, size=2) +
  ggtitle("A. Full Dataset") +
@@ -178,13 +177,13 @@ g <- slope_factors %>%
    filter(Treatment == "control") %>%
   ggplot(aes(SiteID, mean))  + 
   geom_bar(aes(x=SiteID, y=mean), stat="identity", fill= "gray") +
-  geom_line(aes(x=SiteID, y=value*100, color = factor, group=factor),stat="identity", size=2)+
+  geom_point(aes(x=SiteID, y=value*100, color = factor, group=factor),stat="identity", size=5)+
   labs(title= "Full Dataset: Control Subcatchments",
        x="Site ID",y="Mean TSS Load") +
   scale_y_continuous(sec.axis=sec_axis(~.*0.01,name="Slope Factor"))
 g
  
-ggsave("../code/fig/control_factors_load.png", g, width = 12, height = 12)
+#ggsave("../code/fig/control_factors_load.png", g, width = 12, height = 12)
 
 ```
 
@@ -194,13 +193,13 @@ gg <- slope_factors %>%
    filter(Treatment == "strips") %>%
   ggplot(aes(SiteID, mean))  + 
   geom_bar(aes(x=SiteID, y=mean), stat="identity", fill= "gray") +
-  geom_line(aes(x=SiteID, y=value*100, color = factor, group=factor),stat="identity", size=2)+
+  geom_point(aes(x=SiteID, y=value*100, color = factor, group=factor),stat="identity", size=5)+
   labs(title= "Full Dataset: Prairie Strip Subcatchments",
        x="Site ID",y="Mean TSS Load") +
   scale_y_continuous(sec.axis=sec_axis(~.*0.01,name="Slope Factor"))
 gg
  
-ggsave("../code/fig/strip_factors_load.png", gg, width = 12, height = 12)
+#ggsave("../code/fig/strip_factors_load.png", gg, width = 12, height = 12)
 
 ```
 
@@ -288,6 +287,7 @@ m_flume <- lmerTest::lmer(log(tss_sum+0.001) ~
                              Treatment*ln_ppt +
                             Treatment*crop +
                             Year*Treatment +
+                            #Treatment*Lfactor +
                             #(1 | SiteID) + #removed due to singular fit
                              (1 | SiteID:Treatment) + 
                             (1|Year:sample_event) + #consider this and below with SiteID 
@@ -360,34 +360,21 @@ year = emmeans(m_flume, ~ Year,
 confint(year)
 
 ##make this a function of what it is equal to (ln_ppt), could automate, but doing manual, ##uniroot()
-trt_ppt = emmeans(m_flume, pairwise ~ Treatment|ln_ppt,
-                    at=list(ln_ppt=c(-4,-3.5,-3.05,-3,-2)), 
+#trt_ppt = emmeans(m_flume, pairwise ~ Treatment|ln_ppt,
+#                    at=list(ln_ppt=c(-4,-3.5,-3.05,-3,-2)), 
                     #at=list(ln_ppt=c(-2.815)), 
-                    type = "response",
-                    lmer.df = "asymptotic")
+#                    type = "response",
+#                    lmer.df = "asymptotic")
 
-contrast(trt_ppt, "pairwise")
-confint(trt_ppt)$contrasts ## exp. the values
-
-trt_ppt2 = emmeans(m_flume, "Treatment",
-                   by='ln_ppt',
-                    at=list(ln_ppt=c(-2.815, -3, -2.45, -3.62)), 
-                    type = "response",
-                    lmer.df = "asymptotic")
-con = contrast(trt_ppt2, "pairwise", options= list(adjust = 'bonferroni'))
-summary(con)
-con
-#emtrends(m_flume, pairwise~Treatment, var="ln_ppt")
-#emmip(m_flume, Treatment~ln_ppt, cov.reduce = range)
-#testInteractions(m_flume, residual=c("Treatment", "crop"))
-
-#pred <- exp(predictInterval(m_flume, newdata = full_df, n.sims = 1000))
+#contrast(trt_ppt, "pairwise")
+#confint(trt_ppt)$contrasts ## exp. the values
 
 crop      = emmeans(m_flume, pairwise ~ Treatment|crop,   
                     type = "response",
                     lmer.df = "asymptotic")
 
 confint(crop)$contrasts
+crop$contrasts
 
 ```
 
