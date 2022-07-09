@@ -291,13 +291,15 @@ groupR <- flumeR %>%
             sd = sd(tss_sum),
             .groups = "drop") %>%
   mutate(se = sd / sqrt(n),
-         lb = mean + qt(0.025, df = n-1)*se,
+         lb = mean + qt(0.025, df = n-1)*se+1.7,
          ub = mean - qt(0.025, df = n-1)*se)
+
+groupR[groupR < 0] <- 0
 
 trt_plotR <- groupR %>%
   ggplot(aes(x=Treatment, y=mean, fill=Treatment))+
   geom_bar(width = 0.5, position = position_dodge(), stat="summary") +
-  geom_errorbar(aes(ymin = (mean-se), ymax = (mean+se)),
+  geom_errorbar(aes(ymin = (lb), ymax = (ub)),
                 width = 0.3,
                 linetype = "solid",
                 position = position_dodge(width = 0.5),
@@ -313,7 +315,7 @@ trt_plotR <- groupR %>%
        axis.text.x = element_text(family = "serif", size=28),
        axis.text.y = element_text(family = "serif", size=28)) +
   scale_x_discrete(labels= c("Prairie Strip", "Control")) +
-  scale_y_continuous(limits = c(0, 40)) +
+  scale_y_continuous(limits = c(0, 50)) +
   theme(text = element_text())
 
 trt_plotR
@@ -361,6 +363,8 @@ trtRcrp_grp <- flumeR %>%
           lb = mean + qt(0.025, df = n-1)*se,
           ub = mean - qt(0.025, df = n-1)*se)
  
+trtRcrp_grp[trtRcrp_grp < 0] <- 0
+
  trtRcrp_plot <- trtRcrp_grp %>%
    ggplot(aes(x=crop, y=mean, fill=Treatment))+
    geom_bar(width = 0.5, position = position_dodge(), stat="summary") +
@@ -409,6 +413,7 @@ names(ctrl2017) <- c("Year", "Treatment", "n", "mean", "sd", "groups", "se", "lb
 trtyrR_grpNEW <- rbind(trtyrR_grpNEW, ctrl2017)
 
 trtyrR_grpNEW[trtyrR_grpNEW==0] <- NA
+trtyrR_grpNEW[trtyrR_grpNEW < 0] <- 0
 
 trtR_plot <- trtyrR_grpNEW %>%
   ggplot(aes(x=Year, y=mean, fill=Treatment))+

@@ -389,10 +389,12 @@ group <- full_df %>%
          lb = mean + qt(0.025, df = n-1)*se,
          ub = mean - qt(0.025, df = n-1)*se)
 
+group[group < 0] <- 0
+
 trt_plot <- group %>%
   ggplot(aes(x=Treatment, y=mean, fill=Treatment))+
   geom_bar(width = 0.5, position = position_dodge(), stat="summary") +
-  geom_errorbar(aes(ymin = (mean-se), ymax = (mean+se)),
+  geom_errorbar(aes(ymin = (lb), ymax = (ub)),
                 width = 0.3,
                 linetype = "solid",
                 position = position_dodge(width = 0.5),
@@ -408,10 +410,10 @@ trt_plot <- group %>%
        axis.text.x = element_text(family="serif", size=28),
        axis.text.y = element_text(family="serif", size=28)) +
   scale_x_discrete(labels= c("Prairie Strip", "Control"))+
-  scale_y_continuous(limits = c(0, 40))
+  scale_y_continuous(limits = c(0, 50))
 
 trt_plot
-ggsave("E:/ISU/Project/SoilMove/data/statistics/flume_analysis/code/fig/flume_plot.png", trt_plot)
+ggsave("../code/fig/flume_plot.png", trt_plot)
 ```
 
 ```{r mean_tss_figure, dependson="load"}
@@ -452,6 +454,7 @@ trtyr_grp <- full_df %>%
           lb = mean + qt(0.025, df = n-1)*se,
           ub = mean - qt(0.025, df = n-1)*se)
 
+trtyr_grp[trtyr_grp < 0] <- 0
  
  trt_plot <- trtyr_grp %>%
    ggplot(aes(x=Year, y=mean, fill=Treatment))+
@@ -521,6 +524,8 @@ trtcrp_grp <- full_df %>%
           lb = mean + qt(0.025, df = n-1)*se,
           ub = mean - qt(0.025, df = n-1)*se)
  
+trtcrp_grp[trtcrp_grp < 0] <- 0
+
  trtcrp_plot <- trtcrp_grp %>%
    ggplot(aes(x=crop, y=mean, fill=Treatment))+
    geom_bar(width = 0.5, position = position_dodge(), stat="summary") +
