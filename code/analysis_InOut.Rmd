@@ -46,14 +46,14 @@ sessionInfo()
 fullR_out <- read_csv("../data/tidy/full_df_out.csv") %>%
   mutate(Year = factor(Year),
          Treatment = factor(Treatment, levels=c('strips','control'))) %>%
-    subset(Year != 2021) %>%
-    subset(random == 'R')
+    subset(Year != 2021) #%>%
+    #subset(random == 'R')
 
 fullR_in <- read_csv("../data/tidy/full_df_in.csv") %>%
   mutate(Year = factor(Year),
          Treatment = factor(Treatment, levels=c('strips','control'))) %>%
-    subset(Year != 2021) %>%
-    subset(random == 'R')
+    subset(Year != 2021) #%>%
+    #subset(random == 'R')
 
 ```
 
@@ -350,6 +350,7 @@ trt_yrI = emmeans(mIn, pairwise ~ Treatment|Year,
                     type = "response",
                     lmer.df = "asymptotic") 
 confint(trt_yrI)$contrasts
+trt_yrI $contrasts
 
 trtI = emmeans(mIn, pairwise ~ Treatment, 
                     type = "response", 
@@ -366,6 +367,7 @@ cropI      = emmeans(mIn, pairwise ~ Treatment|crop,
                     lmer.df = "asymptotic")
 
 confint(cropI)$contrasts
+cropI$contrasts
 
 ```
 
