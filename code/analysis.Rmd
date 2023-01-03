@@ -138,9 +138,9 @@ g
 
 
 ```{r, dependson="load"}
-h <- ggplot(full_df, aes(x=log(rain), y=log(tss_sum+0.001)), inherit.aes = FALSE) +
+#h <- ggplot(full_df, aes(x=log(rain), y=log(tss_sum+0.001)), inherit.aes = FALSE) +
 #h <- ggplot(full_df, aes(x=Lfactor, y=log(tss_sum+0.001), color=Treatment), inherit.aes = FALSE) +
-#h <- ggplot(TSS_Lfactor, aes(x=Lfactor, y=ln_mean, color=Treatment), inherit.aes = FALSE) +
+h <- ggplot(TSS_Lfactor, aes(x=Lfactor, y=ln_mean, color=Treatment), inherit.aes = FALSE) +
  scale_color_manual(values = c("control" = "#C38820",
                               "strips" = "#176D9C"),
                   labels=c( "Control", "Prairie Strip"),
@@ -208,7 +208,7 @@ gg
 load_time <- read_csv("../data/tidy/load_weight_year220622.csv")
 load_time
 
-model <- lm(log(tss_sum+0.001) ~ Treatment*Lfact_below,
+model <- lm(log(tss_sum+0.001) ~ Treatment*Lfactor,
             data = full_df)
 
 summary(model)
