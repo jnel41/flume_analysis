@@ -45,12 +45,14 @@ sessionInfo()
 ```{r load, dependson= "full_dataframe"}
 fullR_out <- read_csv("../data/tidy/full_df_out.csv") %>%
   mutate(Year = factor(Year),
-         Treatment = factor(Treatment, levels=c('strips','control'))) #%>%
+         Treatment = factor(Treatment, levels=c('strips','control'))) %>%
+    subset(Year != 2021) #%>%
     #subset(random == 'R')
 
 fullR_in <- read_csv("../data/tidy/full_df_in.csv") %>%
   mutate(Year = factor(Year),
-         Treatment = factor(Treatment, levels=c('strips','control'))) #%>%
+         Treatment = factor(Treatment, levels=c('strips','control'))) %>%
+    subset(Year != 2021) #%>%
     #subset(random == 'R')
 
 ```
@@ -207,8 +209,8 @@ mOut <- lmerTest::lmer(log(tss_sum+0.001) ~
                             
                             #(1 | SiteID) + #removed due to singular fit
                              (1 | SiteID:Treatment) + 
-                            (1|Year:sample_event), # + #consider this and below with SiteID 
-                            #(1|SiteID:Year:sample_event), 
+                            (1|Year:sample_event) + #consider this and below with SiteID 
+                            (1|SiteID:Year:sample_event), 
                           
                           data = fullR_out)
 
@@ -235,7 +237,7 @@ There are two possible models:
 - m_flume: full model design, design-based analysis
 - m_flume_model: model design selected based on backward step selection
 
-### Full model design
+### Full model design: Flume Out
 
 ```{r design_Outmodel_residual_plots, dependson = "design_model_Out"}
 resid_panel(mOut, 
@@ -266,6 +268,7 @@ trtO = emmeans(mOut, pairwise ~ Treatment,
                     type = "response", 
                     lmer.df = "asymptotic")
 confint(trtO)
+trtO$contrasts
 
 yearO = emmeans(mOut, ~ Year, 
                     type = "response",
@@ -285,20 +288,20 @@ cropO$contrasts
 ### Treatment effect: Flume In
 
 ```{r design_model_In, dependson = "load"}
-mIn <- lmerTest::lmer(log(tss_load+0.025) ~ 
+mIn <- lmerTest::lmer(log(tss_sum+0.025) ~ 
                              Treatment*ln_ppt +
                             Treatment*crop +
                             Year*Treatment +
                             
-                            #(1 | SiteID) + #removed due to singular fit
+                            (1 | SiteID) + #removed due to singular fit
                              (1 | SiteID:Treatment) + 
-                            (1|Year:sample_event) + #consider this and below with SiteID 
-                            (1|SiteID:Year:sample_event), 
+                            (1|Year:sample_event), # + #consider this and below with SiteID 
+                            #(1|SiteID:Year:sample_event), 
                           
-                          data = full_in)
+                          data = fullR_in)
 
 summary(mIn)
-confint(mIn, oldNames = FALSE)
+#confint(mIn, oldNames = FALSE)
 anova(mIn)
 r2_nakagawa(mIn)
 icc(mIn)
@@ -347,6 +350,7 @@ trt_yrI = emmeans(mIn, pairwise ~ Treatment|Year,
                     type = "response",
                     lmer.df = "asymptotic") 
 confint(trt_yrI)$contrasts
+trt_yrI $contrasts
 
 trtI = emmeans(mIn, pairwise ~ Treatment, 
                     type = "response", 
@@ -363,6 +367,7 @@ cropI      = emmeans(mIn, pairwise ~ Treatment|crop,
                     lmer.df = "asymptotic")
 
 confint(cropI)$contrasts
+cropI$contrasts
 
 ```
 
